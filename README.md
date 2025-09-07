@@ -157,18 +157,31 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 echo 'export DOCKER_BUILDKIT=1' >> ~/.bashrc
 echo 'export COMPOSE_DOCKER_CLI_BUILD=1' >> ~/.bashrc
 
-# 7. Apply Docker group (requires re-login or newgrp)
-newgrp docker
+# 7. Apply Docker group and test access
+newgrp docker << 'EOF'
+# Test Docker access within new group context
+docker --version >/dev/null 2>&1 && echo "✅ Docker access confirmed" || echo "⚠️ Docker access issue - logout/login may be required"
+EOF
 
 # 8. Verify Installation
 echo "🔍 Verifying installation..."
-docker --version
-docker compose version
+docker --version || echo "⚠️ Docker version check failed"
+docker compose version || echo "⚠️ Docker Compose version check failed"
+
+# 9. Final Docker access test
+if docker ps >/dev/null 2>&1; then
+    echo "✅ Docker daemon access confirmed - no logout required!"
+elif sudo docker ps >/dev/null 2>&1; then
+    echo "⚠️ Docker requires sudo - logout/login recommended for group permissions"
+else
+    echo "❌ Docker daemon not accessible - check installation"
+fi
+
 echo "✅ Prerequisites setup complete!"
 echo "🚀 Ready to clone and deploy CyberBlue SOC"
 ```
 
-**⚠️ Important**: After running prerequisites, you may need to **logout and login again** or run `newgrp docker` for group permissions to take effect.
+**💡 Note**: The `newgrp docker` command usually eliminates the need to logout/login. If Docker commands still require `sudo`, then logout/login is needed.
 
 ### ⚡ One-Command Installation
 
