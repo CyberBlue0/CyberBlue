@@ -157,20 +157,77 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 echo 'export DOCKER_BUILDKIT=1' >> ~/.bashrc
 echo 'export COMPOSE_DOCKER_CLI_BUILD=1' >> ~/.bashrc
 
-# 7. Apply Docker group and test access
+# 7. Docker Networking Configuration (Prevents common networking errors)
+echo "🔧 Configuring Docker networking to prevent installation errors..."
+
+# Configure Docker daemon for better networking
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json > /dev/null <<'DAEMON_EOF'
+{
+  "iptables": true,
+  "userland-proxy": false,
+  "live-restore": true,
+  "storage-driver": "overlay2",
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+DAEMON_EOF
+
+# Reset iptables to prevent conflicts (common cause of networking errors)
+sudo iptables -t nat -F 2>/dev/null || true
+sudo iptables -t mangle -F 2>/dev/null || true
+sudo iptables -F 2>/dev/null || true
+sudo iptables -X 2>/dev/null || true
+
+# Restart Docker with new configuration
+sudo systemctl restart docker
+sleep 5
+
+# Clean any existing Docker networks that might conflict
+sudo docker network prune -f 2>/dev/null || true
+
+# 8. Port Conflict Prevention
+echo "🔍 Checking for potential port conflicts..."
+REQUIRED_PORTS="5443 7000 7001 7002 7003 7004 7005 7006 7007 7008 7009 7010 7011 7012 7013 7014 7015 9200 9443 1514 1515 55000"
+CONFLICTS=()
+
+for port in $REQUIRED_PORTS; do
+    if sudo netstat -tulpn 2>/dev/null | grep -q ":$port "; then
+        CONFLICTS+=($port)
+    fi
+done
+
+if [ ${#CONFLICTS[@]} -gt 0 ]; then
+    echo "⚠️ WARNING: The following ports are already in use: ${CONFLICTS[*]}"
+    echo "   These may cause conflicts during CyberBlue deployment"
+    echo "   Consider stopping services using these ports or rebooting if needed"
+else
+    echo "✅ All required ports are available"
+fi
+
+# 9. Apply Docker group and test access
 newgrp docker << 'EOF'
 # Test Docker access within new group context
 docker --version >/dev/null 2>&1 && echo "✅ Docker access confirmed" || echo "⚠️ Docker access issue - logout/login may be required"
 EOF
 
-# 8. Verify Installation
+# 10. Verify Installation
 echo "🔍 Verifying installation..."
 docker --version || echo "⚠️ Docker version check failed"
 docker compose version || echo "⚠️ Docker Compose version check failed"
 
-# 9. Final Docker access test
+# 11. Final Docker access and networking test
 if docker ps >/dev/null 2>&1; then
     echo "✅ Docker daemon access confirmed - no logout required!"
+    # Test Docker networking capability
+    if docker network ls >/dev/null 2>&1; then
+        echo "✅ Docker networking confirmed - ready for CyberBlue deployment!"
+    else
+        echo "⚠️ Docker networking issue detected - may need system reboot"
+    fi
 elif sudo docker ps >/dev/null 2>&1; then
     echo "⚠️ Docker requires sudo - logout/login recommended for group permissions"
 else
