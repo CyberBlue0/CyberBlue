@@ -37,11 +37,11 @@ echo "=================================="
 echo "🧹 Cleaning up any existing build directories..."
 if [ -d "attack-navigator" ]; then
     echo "   Removing existing attack-navigator/ directory..."
-    rm -rf attack-navigator/
+    sudo rm -rf attack-navigator/
 fi
 if [ -d "wireshark" ]; then
     echo "   Removing existing wireshark/ directory..."
-    rm -rf wireshark/
+    sudo rm -rf wireshark/
 fi
 
 # Clone MITRE ATTACK Nav.
