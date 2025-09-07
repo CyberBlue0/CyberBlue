@@ -111,61 +111,80 @@ CyberBlue transforms Blue Teams cybersecurity tool deployment into a **one-comma
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- **Docker** 20.10+ and **Docker Compose** 2.0+
+### 📋 Prerequisites & System Setup
+
+**System Requirements:**
+- **RAM**: 16+ GB recommended (8GB minimum)
+- **Storage**: 100GB+ free disk space
+- **OS**: Ubuntu 22.04+ LTS (tested on 22.04.5 & 24.04.2)
+- **Network**: Internet connection for downloads
+
+**Complete Prerequisites Setup (Copy & Paste):**
 ```bash
-sudo apt update && \
-sudo apt install -y ca-certificates curl gnupg lsb-release && \
-sudo mkdir -p /etc/apt/keyrings && \
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-sudo apt update && \
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && \
-sudo usermod -aG docker $USER && \
-newgrp docker && \
-sudo chown root:docker /var/run/docker.sock && \
-sudo chmod 660 /var/run/docker.sock && \
-sudo systemctl enable docker && sudo systemctl start docker && \
-docker --version && docker compose version 
+# ===== COMPLETE CYBERBLUE SOC PREREQUISITES SETUP =====
+# Run this entire block on any Ubuntu system (AWS, VMware, VirtualBox, bare metal)
+
+# 1. System Update and Basic Packages
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y ca-certificates curl gnupg lsb-release git
+
+# 2. Docker Installation (Latest)
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# 3. Docker Compose (Latest - Important for VMware/VirtualBox)
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# 4. User Permissions and Docker Setup
+sudo usermod -aG docker $USER
+sudo chown root:docker /var/run/docker.sock
+sudo chmod 660 /var/run/docker.sock
+sudo systemctl enable docker && sudo systemctl start docker
+
+# 5. System Optimizations for Containers
+echo 'vm.max_map_count=262144' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+echo '* soft nofile 65536' | sudo tee -a /etc/security/limits.conf
+echo '* hard nofile 65536' | sudo tee -a /etc/security/limits.conf
+
+# 6. Environment Variables (Prevents VMware/VirtualBox warnings)
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+echo 'export DOCKER_BUILDKIT=1' >> ~/.bashrc
+echo 'export COMPOSE_DOCKER_CLI_BUILD=1' >> ~/.bashrc
+
+# 7. Apply Docker group (requires re-login or newgrp)
+newgrp docker
+
+# 8. Verify Installation
+echo "🔍 Verifying installation..."
+docker --version
+docker compose version
+echo "✅ Prerequisites setup complete!"
+echo "🚀 Ready to clone and deploy CyberBlue SOC"
 ```
-- **RAM** (16+ GB recommended)
-- **100GB+ free disk space**
-- **Linux/Ubuntu** (tested only on Ubuntu 22.04.5 LTS & Ubuntu 24.04.2 LTS)
+
+**⚠️ Important**: After running prerequisites, you may need to **logout and login again** or run `newgrp docker` for group permissions to take effect.
 
 ### ⚡ One-Command Installation
+
+**After completing prerequisites above:**
 
 ```bash
 # Clone the repository
 git clone https://github.com/CyberBlue0/CyberBlue.git
 cd CyberBlue
 
-# For VMware/VirtualBox environments (run first):
-./fix-vmware-compatibility.sh
-
-# Run the initialization script 
+# Run the initialization script (works on all platforms)
 chmod +x cyberblue_init.sh
 ./cyberblue_init.sh
 ```
 
-### 🖥️ **VMware/VirtualBox Compatibility**
-
-If deploying on VMware or VirtualBox VMs, run the compatibility fix first:
-
-```bash
-# Fix Docker Compose compatibility issues
-./fix-vmware-compatibility.sh
-
-# Then proceed with normal installation
-./cyberblue_init.sh
-```
-
-**Why VMware needs fixes:**
-- Docker Compose version differences
-- Missing cloud environment variables  
-- Stricter local validation rules
-- Different volume permission handling
-
-See [VMware Compatibility Guide](VMWARE_COMPATIBILITY_FIX.md) for detailed information.
+**That's it!** The prerequisites setup handles all platform differences (AWS, VMware, VirtualBox, bare metal).
 
 ### 🔍 **Enhanced Arkime Operations**
 
