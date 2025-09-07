@@ -132,7 +132,7 @@ cleanup_pcap_files() {
         for pcap_file in ./arkime/pcaps/*.pcap; do
             filename=$(basename "$pcap_file")
             echo "   Removing: $filename"
-            rm -f "$pcap_file"
+            sudo rm -f "$pcap_file"
         done
         echo "✅ PCAP files cleaned up"
     else
