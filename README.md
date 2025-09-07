@@ -136,13 +136,36 @@ docker --version && docker compose version
 
 ```bash
 # Clone the repository
-git clone https://github.com/CyberBlue0/CyberBlueSOC1.git
-cd CyberBlueSOC
+git clone https://github.com/CyberBlue0/CyberBlue.git
+cd CyberBlue
+
+# For VMware/VirtualBox environments (run first):
+./fix-vmware-compatibility.sh
 
 # Run the initialization script 
 chmod +x cyberblue_init.sh
 ./cyberblue_init.sh
 ```
+
+### 🖥️ **VMware/VirtualBox Compatibility**
+
+If deploying on VMware or VirtualBox VMs, run the compatibility fix first:
+
+```bash
+# Fix Docker Compose compatibility issues
+./fix-vmware-compatibility.sh
+
+# Then proceed with normal installation
+./cyberblue_init.sh
+```
+
+**Why VMware needs fixes:**
+- Docker Compose version differences
+- Missing cloud environment variables  
+- Stricter local validation rules
+- Different volume permission handling
+
+See [VMware Compatibility Guide](VMWARE_COMPATIBILITY_FIX.md) for detailed information.
 
 ### 🔍 **Enhanced Arkime Operations**
 
