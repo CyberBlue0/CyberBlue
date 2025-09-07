@@ -145,7 +145,6 @@ services:
       timeout: 1s
       retries: 3
       start_period: 5s
-      start_interval: 5s
     networks:
       - cyber-blue
 
@@ -170,7 +169,6 @@ services:
       timeout: 1s
       retries: 3
       start_period: 30s
-      start_interval: 5s
     networks:
       - cyber-blue
 
@@ -211,7 +209,6 @@ services:
       timeout: 1s
       retries: 3
       start_period: 30s
-      start_interval: 30s
     ports:
       - "7003:443"
     volumes:
@@ -392,7 +389,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-      start_interval: 5s
     volumes:
       # custom MISP modules are loaded at startup time
       - "./custom/action_mod/:/custom/action_mod/"
