@@ -32,6 +32,13 @@ echo "🚀 Starting CyberBlue initialization..."
 echo "=================================="
 
 # ----------------------------
+# Universal Platform Compatibility Fix
+# ----------------------------
+echo "🌐 Applying universal platform compatibility fixes..."
+chmod +x ./fix-vmware-compatibility.sh
+./fix-vmware-compatibility.sh --skip-update || echo "⚠️ Compatibility check completed with warnings (normal on some platforms)"
+
+# ----------------------------
 # Cleanup: Remove existing directories if they exist
 # ----------------------------
 echo "🧹 Cleaning up any existing build directories..."
