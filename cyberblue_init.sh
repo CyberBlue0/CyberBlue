@@ -72,9 +72,17 @@ else
     echo "MISP_BASE_URL=${MISP_URL}" >> .env
 fi
 
+# Set or update HOST_IP for portal dynamic IP detection
+if grep -q "^HOST_IP=" .env; then
+    sed -i "s|^HOST_IP=.*|HOST_IP=${HOST_IP}|" .env
+else
+    echo "HOST_IP=${HOST_IP}" >> .env
+fi
+
 # Show result
 echo "✅ .env updated with:"
 grep "^MISP_BASE_URL=" .env
+grep "^HOST_IP=" .env
 
 # ----------------------------
 # Generate YETI_AUTH_SECRET_KEY
