@@ -32,13 +32,6 @@ echo "🚀 Starting CyberBlue initialization..."
 echo "=================================="
 
 # ----------------------------
-# Universal Platform Compatibility Fix
-# ----------------------------
-echo "🌐 Applying universal platform compatibility fixes..."
-chmod +x ./fix-vmware-compatibility.sh
-./fix-vmware-compatibility.sh --skip-update || echo "⚠️ Compatibility check completed with warnings (normal on some platforms)"
-
-# ----------------------------
 # Cleanup: Remove existing directories if they exist
 # ----------------------------
 echo "🧹 Cleaning up any existing build directories..."
@@ -160,8 +153,8 @@ sudo curl -s -o ./suricata/reference.config https://raw.githubusercontent.com/OI
 # Launching Services
 # ----------------------------
 echo "🚀 Running Docker initialization commands..."
-sudo docker-compose run --rm generator
-sudo docker-compose up --build -d
+sudo docker compose run --rm generator
+sudo docker compose up --build -d
 
 # ----------------------------
 # Docker External Access Fix (Universal)
@@ -243,7 +236,7 @@ sudo docker run --rm \
   -e FLEET_MYSQL_PASSWORD=fleetpass \
   -e FLEET_MYSQL_DATABASE=fleet \
   fleetdm/fleet:latest fleet prepare db
-sudo docker-compose up -d fleet-server
+sudo docker compose up -d fleet-server
 
 # ----------------------------
 # Enhanced Arkime Setup using dedicated script
