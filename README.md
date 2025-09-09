@@ -244,7 +244,18 @@ echo "🚀 Ready to clone and deploy CyberBlue SOC"
 
 **Choose your preferred installation method:**
 
-#### 🎯 **Method 1: One-Command Installation (Recommended for New Users)**
+#### 🎯 **Method 1: Foolproof Installation (Recommended for New Users)**
+```bash
+# Clone the repository
+git clone https://github.com/CyberBlue0/CyberBlue.git
+cd CyberBlue
+
+# One command handles everything (prerequisites + Docker group + CyberBlue)
+chmod +x install-cyberblue.sh
+./install-cyberblue.sh
+```
+
+#### 🔧 **Method 2: One-Command with Manual Prerequisites Flag**
 ```bash
 # Clone the repository
 git clone https://github.com/CyberBlue0/CyberBlue.git
@@ -255,7 +266,7 @@ chmod +x cyberblue_init.sh install-prerequisites.sh
 ./cyberblue_init.sh --install-prerequisites
 ```
 
-#### 🔧 **Method 2: Manual Prerequisites (Recommended for Advanced Users)**
+#### 🔧 **Method 3: Manual Prerequisites (Recommended for Advanced Users)**
 ```bash
 # Clone the repository
 git clone https://github.com/CyberBlue0/CyberBlue.git
@@ -270,7 +281,7 @@ chmod +x cyberblue_init.sh
 ./cyberblue_init.sh
 ```
 
-#### 📋 **Method 3: Copy-Paste Prerequisites (Legacy)**
+#### 📋 **Method 4: Copy-Paste Prerequisites (Legacy)**
 ```bash
 # Use the complete prerequisites setup block above, then:
 git clone https://github.com/CyberBlue0/CyberBlue.git

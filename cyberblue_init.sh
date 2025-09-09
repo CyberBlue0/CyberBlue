@@ -73,6 +73,20 @@ check_prerequisites() {
             if [[ -f "$SCRIPT_DIR/install-prerequisites.sh" ]]; then
                 "$SCRIPT_DIR/install-prerequisites.sh" --force
                 echo "✅ Prerequisites installed successfully"
+                
+                # Apply Docker group in current session to avoid logout/login
+                echo "🔧 Applying Docker group permissions for current session..."
+                if sg docker -c "docker --version" >/dev/null 2>&1; then
+                    echo "✅ Docker access ready - continuing with installation"
+                    export DOCKER_ACCESS_READY=true
+                else
+                    echo "⚠️  Docker group requires session refresh"
+                    echo "🔄 Applying Docker group with newgrp..."
+                    exec newgrp docker << 'EOF'
+# Continue installation in new group context
+exec "$0" "${@/--install-prerequisites/}"
+EOF
+                fi
             else
                 echo "❌ Prerequisites script not found: $SCRIPT_DIR/install-prerequisites.sh"
                 exit 1
@@ -258,6 +272,22 @@ sudo curl -s -o ./suricata/reference.config https://raw.githubusercontent.com/OI
 # Launching Services
 # ----------------------------
 echo "🚀 Running Docker initialization commands..."
+
+# ----------------------------
+# Caldera Directory Verification
+# ----------------------------
+echo "🧠 Verifying Caldera setup..."
+if [[ ! -d "./caldera" ]]; then
+    echo "📦 Caldera directory not found, running Caldera installation..."
+    if [[ -f "./install_caldera.sh" ]]; then
+        chmod +x ./install_caldera.sh
+        ./install_caldera.sh
+    else
+        echo "⚠️  install_caldera.sh not found, Caldera will be skipped"
+    fi
+else
+    echo "✅ Caldera directory found"
+fi
 
 # ----------------------------
 # Enhanced Wazuh SSL Certificate Setup

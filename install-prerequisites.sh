@@ -163,7 +163,7 @@ install_basic_packages() {
     if [[ "$SKIP_UPDATES" == "false" ]]; then
         log_info "Updating system packages..."
         sudo apt update >/dev/null 2>&1
-        sudo apt upgrade -y >/dev/null 2>&1
+        DEBIAN_FRONTEND=noninteractive sudo apt upgrade -y >/dev/null 2>&1
         log "System updated successfully"
     else
         log_warn "Skipping system updates (--skip-updates specified)"
@@ -171,7 +171,7 @@ install_basic_packages() {
     fi
     
     log_info "Installing basic packages..."
-    sudo apt install -y ca-certificates curl gnupg lsb-release git >/dev/null 2>&1
+    DEBIAN_FRONTEND=noninteractive sudo apt install -y ca-certificates curl gnupg lsb-release git >/dev/null 2>&1
     log "Basic packages installed"
 }
 
@@ -188,7 +188,7 @@ install_docker() {
     
     # Install Docker
     sudo apt update >/dev/null 2>&1
-    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1
+    DEBIAN_FRONTEND=noninteractive sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1
     
     log "Docker CE installed successfully"
 }
@@ -352,14 +352,25 @@ test_docker_access() {
 apply_docker_group() {
     log_info "Applying Docker group permissions..."
     
-    newgrp docker << 'EOF'
-# Test Docker access within new group context
-if docker --version >/dev/null 2>&1; then
-    echo "✅ Docker access confirmed"
-else
-    echo "⚠️ Docker access issue - logout/login may be required"
-fi
-EOF
+    # Force apply group membership without requiring logout/login
+    sudo usermod -aG docker $USER
+    
+    # Restart Docker to ensure proper group recognition
+    sudo systemctl restart docker
+    sleep 5
+    
+    # Change socket permissions to ensure immediate access
+    sudo chown root:docker /var/run/docker.sock
+    sudo chmod 660 /var/run/docker.sock
+    
+    # Test Docker access in current session
+    if sg docker -c "docker --version" >/dev/null 2>&1; then
+        log "Docker access confirmed - no logout required!"
+        export DOCKER_ACCESS_READY=true
+    else
+        log_warn "Docker group applied but may need session refresh"
+        log_warn "If Docker commands fail, run: newgrp docker"
+    fi
 }
 
 # Verify installation
@@ -446,3 +457,5 @@ main() {
 
 # Run main function with all arguments
 main "$@"
+
+
