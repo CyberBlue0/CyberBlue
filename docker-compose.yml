@@ -788,6 +788,26 @@ services:
     security_opt:
       - seccomp:unconfined
 
+  caldera:
+    build:
+      context: ./caldera
+      dockerfile: Dockerfile
+      args:
+        - VARIANT=full
+    container_name: caldera
+    hostname: caldera
+    ports:
+      - "7009:8888"
+    volumes:
+      - ./caldera/conf/local.yml:/usr/src/app/conf/local.yml
+      - ./caldera/data:/usr/src/app/data
+      - ./caldera/logs:/usr/src/app/logs
+    networks:
+      - cyber-blue
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+
 volumes:
   wazuh_api_configuration:
   wazuh_etc:

@@ -2,7 +2,8 @@
 set -e  # Exit immediately if a command fails
 
 # === Configuration ===
-INSTALL_DIR="$HOME/caldera"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$SCRIPT_DIR/caldera"
 PORT_MAPPING="7009:8888"
 LOCAL_YML="$INSTALL_DIR/conf/local.yml"
 
@@ -84,24 +85,16 @@ users:
     blue: cyberblue
 EOF
 
-# Step 3: Build Docker image
-echo "[+] Building Docker image with plugins..."
-cd "$INSTALL_DIR" || { echo "[-] Failed to cd into $INSTALL_DIR"; exit 1; }
-sudo docker build --build-arg VARIANT=full -t caldera .
+# Step 3: Build and run Caldera using docker-compose
+echo "[+] Building and starting Caldera with docker-compose..."
+cd "$SCRIPT_DIR" || { echo "[-] Failed to cd into $SCRIPT_DIR"; exit 1; }
 
-# Step 4: Run Caldera in background, remove existing container if needed
+# Stop any existing Caldera container
+sudo docker-compose stop caldera 2>/dev/null || true
+sudo docker-compose rm -f caldera 2>/dev/null || true
+
+# Build and start Caldera
+sudo docker-compose up -d caldera
+
 HOST_PORT="${PORT_MAPPING%%:*}"
-CONTAINER_PORT="${PORT_MAPPING##*:}"
-
-echo "[+] Removing existing container (if any)..."
-sudo docker rm -f caldera 2>/dev/null || true
-
-echo "[+] Running Caldera silently on http://localhost:$HOST_PORT ..."
-sudo docker run -d \
-  --name caldera \
-  --network cyber-blue \
-  -p "$HOST_PORT:$CONTAINER_PORT" \
-  -v "$LOCAL_YML":/usr/src/app/conf/local.yml \
-  caldera > /dev/null 2>&1
-
 echo "[✓] Caldera is running in the background on http://localhost:$HOST_PORT"
