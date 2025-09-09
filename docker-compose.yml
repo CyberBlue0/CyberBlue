@@ -126,6 +126,7 @@ services:
   mail:
     image: ixdotai/smtp
     container_name: misp-mail
+    restart: unless-stopped
     environment:
       - "SMARTHOST_ADDRESS=${SMARTHOST_ADDRESS}"
       - "SMARTHOST_PORT=${SMARTHOST_PORT}"
@@ -138,6 +139,7 @@ services:
   redis:
     image: valkey/valkey:7.2
     container_name: misp-redis
+    restart: unless-stopped
     command: "--requirepass '${REDIS_PASSWORD:-redispassword}'"
     healthcheck:
       test: "valkey-cli -a '${REDIS_PASSWORD:-redispassword}' -p ${REDIS_PORT:-6379} ping | grep -q PONG || exit 1"
@@ -371,6 +373,7 @@ services:
       - "HSTS_MAX_AGE=${HSTS_MAX_AGE}"
       - "X_FRAME_OPTIONS=${X_FRAME_OPTIONS}"
       - "CONTENT_SECURITY_POLICY=${CONTENT_SECURITY_POLICY}"
+    restart: unless-stopped
     networks:
       - cyber-blue
 
@@ -395,6 +398,7 @@ services:
       - "./custom/expansion/:/custom/expansion/"
       - "./custom/export_mod/:/custom/export_mod/"
       - "./custom/import_mod/:/custom/import_mod/"
+    restart: unless-stopped
     networks:
       - cyber-blue
 
@@ -405,6 +409,7 @@ services:
   cyberchef:
     image: mpepping/cyberchef
     container_name: cyberchef
+    restart: unless-stopped
     ports:
       - "7004:8000"
     networks:
@@ -427,6 +432,7 @@ services:
       - DISABLE_SECURITY_PLUGIN=true
       - DISABLE_INSTALL_DEMO_CONFIG=true
       - discovery.type=single-node
+    restart: unless-stopped
     networks:
       - cyber-blue
 
@@ -451,6 +457,7 @@ services:
       - type: bind
         source: $PCAP_DIR
         target: /data/pcap
+    restart: unless-stopped
     networks:
       - cyber-blue
 
@@ -503,12 +510,14 @@ services:
       FLEET_SERVER_TLS: "false"
     volumes:
       - fleet-server-data:/var/lib/fleet
+    restart: unless-stopped
     networks:
       - cyber-blue
 
   thehive:
     image: strangebee/thehive:5.3.9-1
     container_name: thehive
+    restart: unless-stopped
     ports:
       - "7005:9000"
     networks:
@@ -523,6 +532,7 @@ services:
       - script.allowed_types=inline
       - thread_pool.search.queue_size=100000
       - thread_pool.write.queue_size=10000
+    restart: unless-stopped
     ports:
       - "9210:9200"
       - "9300:9300"
@@ -539,6 +549,7 @@ services:
     #  - ${job_directory}:${job_directory}
     depends_on:
       - elasticsearch
+    restart: unless-stopped
     ports:
       - "0.0.0.0:7006:9001"
     networks:
@@ -549,6 +560,7 @@ services:
     container_name: wazuh-cert-genrator
     hostname: wazuh-certs-generator
     command: generate-indexer-certs
+    restart: "no"
     volumes:
       - ./wazuh/config/certs.yml:/config/certs.yml
       - ./wazuh/config/wazuh_indexer_ssl_certs/:/certificates/

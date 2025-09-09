@@ -318,6 +318,7 @@ Individual tools are available on ports **7000-7099**:
 ### 📚 Comprehensive Documentation
 - **[📚 Documentation Hub](docs/README.md)** - Complete documentation index
 - **[⚡ Quick Reference](QUICK_REFERENCE.md)** - Essential commands and access information
+- **[📜 Scripts Documentation](SCRIPTS_DOCUMENTATION.md)** - Complete guide to all available scripts
 - **[🔍 Arkime Setup](ARKIME_SETUP.md)** - Network analysis with sample data
 - **[📊 System Verification](SYSTEM_VERIFICATION_REPORT.md)** - Current system status
 - **[📖 User Guide](docs/USER_GUIDE.md)** - How to use all CyberBlue tools

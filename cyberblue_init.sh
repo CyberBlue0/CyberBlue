@@ -217,13 +217,21 @@ apply_docker_networking_fixes() {
             if ! dpkg -l | grep -q iptables-persistent; then
                 echo "📦 Installing iptables-persistent for rule persistence..."
                 sudo apt update >/dev/null 2>&1
-                DEBIAN_FRONTEND=noninteractive sudo apt install -y iptables-persistent >/dev/null 2>&1 || true
+                # Pre-seed debconf to avoid interactive prompts
+                echo "iptables-persistent iptables-persistent/autosave_v4 boolean true" | sudo debconf-set-selections
+                echo "iptables-persistent iptables-persistent/autosave_v6 boolean true" | sudo debconf-set-selections
+                # Install with non-interactive frontend and timeout protection
+                timeout 60 sudo DEBIAN_FRONTEND=noninteractive apt install -y iptables-persistent >/dev/null 2>&1 || {
+                    echo "⚠️ iptables-persistent installation timed out or failed, continuing without persistence"
+                }
             fi
             
             if dpkg -l | grep -q iptables-persistent; then
                 sudo mkdir -p /etc/iptables
                 sudo iptables-save | sudo tee /etc/iptables/rules.v4 >/dev/null 2>&1 || true
                 echo "✅ Docker networking rules made persistent"
+            else
+                echo "ℹ️ iptables rules configured but not persistent (will reset on reboot)"
             fi
         fi
         
