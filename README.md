@@ -240,21 +240,46 @@ echo "🚀 Ready to clone and deploy CyberBlue SOC"
 
 **💡 Note**: The `newgrp docker` command usually eliminates the need to logout/login. If Docker commands still require `sudo`, then logout/login is needed.
 
-### ⚡ One-Command Installation
+### ⚡ Installation Options
 
-**After completing prerequisites above:**
+**Choose your preferred installation method:**
 
+#### 🎯 **Method 1: One-Command Installation (Recommended for New Users)**
 ```bash
 # Clone the repository
 git clone https://github.com/CyberBlue0/CyberBlue.git
 cd CyberBlue
 
-# Run the initialization script (works on all platforms)
+# One command installs everything (prerequisites + CyberBlue)
+chmod +x cyberblue_init.sh install-prerequisites.sh
+./cyberblue_init.sh --install-prerequisites
+```
+
+#### 🔧 **Method 2: Manual Prerequisites (Recommended for Advanced Users)**
+```bash
+# Clone the repository
+git clone https://github.com/CyberBlue0/CyberBlue.git
+cd CyberBlue
+
+# Step 1: Install prerequisites manually
+chmod +x install-prerequisites.sh
+./install-prerequisites.sh
+
+# Step 2: Run CyberBlue initialization
 chmod +x cyberblue_init.sh
 ./cyberblue_init.sh
 ```
 
-**That's it!** The prerequisites setup handles all platform differences (AWS, VMware, VirtualBox, bare metal).
+#### 📋 **Method 3: Copy-Paste Prerequisites (Legacy)**
+```bash
+# Use the complete prerequisites setup block above, then:
+git clone https://github.com/CyberBlue0/CyberBlue.git
+cd CyberBlue
+chmod +x cyberblue_init.sh
+./cyberblue_init.sh
+```
+
+**💡 All methods work on all platforms (AWS, VMware, VirtualBox, bare metal).**
 
 ### 🔍 **Enhanced Arkime Operations**
 

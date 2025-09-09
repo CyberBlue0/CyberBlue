@@ -2,8 +2,100 @@
 
 set -e  # Exit on error
 
+# Configuration
+INSTALL_PREREQUISITES=false
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --install-prerequisites)
+                INSTALL_PREREQUISITES=true
+                shift
+                ;;
+            --help)
+                show_help
+                exit 0
+                ;;
+            *)
+                echo "❌ Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+show_help() {
+    echo "🚀 CyberBlue SOC Platform Initialization"
+    echo ""
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --install-prerequisites  Automatically install prerequisites (Docker, etc.)"
+    echo "  --help                   Show this help message"
+    echo ""
+    echo "Installation Methods:"
+    echo "  Method 1 (Manual Prerequisites):"
+    echo "    ./install-prerequisites.sh"
+    echo "    ./cyberblue_init.sh"
+    echo ""
+    echo "  Method 2 (Automatic Prerequisites):"
+    echo "    ./cyberblue_init.sh --install-prerequisites"
+    echo ""
+}
+
+# Check prerequisites
+check_prerequisites() {
+    local missing_deps=()
+    
+    # Check Docker
+    if ! command -v docker >/dev/null 2>&1; then
+        missing_deps+=("Docker")
+    fi
+    
+    # Check Docker Compose
+    if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
+        missing_deps+=("Docker Compose")
+    fi
+    
+    # Check Docker daemon
+    if ! docker ps >/dev/null 2>&1; then
+        missing_deps+=("Docker daemon access")
+    fi
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        echo "⚠️  Missing prerequisites: ${missing_deps[*]}"
+        
+        if [[ "$INSTALL_PREREQUISITES" == "true" ]]; then
+            echo "🚀 Installing prerequisites automatically..."
+            if [[ -f "$SCRIPT_DIR/install-prerequisites.sh" ]]; then
+                "$SCRIPT_DIR/install-prerequisites.sh" --force
+                echo "✅ Prerequisites installed successfully"
+            else
+                echo "❌ Prerequisites script not found: $SCRIPT_DIR/install-prerequisites.sh"
+                exit 1
+            fi
+        else
+            echo ""
+            echo "📋 To install prerequisites:"
+            echo "  Option 1: ./install-prerequisites.sh"
+            echo "  Option 2: ./cyberblue_init.sh --install-prerequisites"
+            echo ""
+            echo "Or manually install Docker and Docker Compose, then run this script again."
+            exit 1
+        fi
+    else
+        echo "✅ All prerequisites are satisfied"
+    fi
+}
+
 # Record start time
 START_TIME=$(date +%s)
+
+# Parse arguments first
+parse_args "$@"
 
 echo ""
 echo "🎉 =================================="
@@ -30,6 +122,11 @@ echo "   ✅ Perfect for cybersecurity training"
 echo ""
 echo "🚀 Starting CyberBlue initialization..."
 echo "=================================="
+
+# Check prerequisites before starting
+echo "🔍 Checking prerequisites..."
+check_prerequisites
+echo ""
 
 # ----------------------------
 # Cleanup: Remove existing directories if they exist

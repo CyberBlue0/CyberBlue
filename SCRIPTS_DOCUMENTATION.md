@@ -20,8 +20,12 @@ This document provides comprehensive documentation for all available scripts in 
 **Primary installation script for CyberBlue SOC platform**
 
 ```bash
-./cyberblue_init.sh
+./cyberblue_init.sh [OPTIONS]
 ```
+
+**Options:**
+- `--install-prerequisites` - Automatically install prerequisites (Docker, etc.)
+- `--help` - Show help message
 
 **Purpose:** Complete initialization and deployment of all CyberBlue SOC tools
 **Features:**
@@ -31,10 +35,51 @@ This document provides comprehensive documentation for all available scripts in 
 - ✅ Initializes Arkime with sample data
 - ✅ Configures auto-start services
 - ✅ Creates system backups
+- ✅ Prerequisites checking and auto-installation
 
-**Prerequisites:** Docker and Docker Compose installed
-**Runtime:** ~15-20 minutes
+**Prerequisites:** Docker and Docker Compose (or use `--install-prerequisites`)
+**Runtime:** ~15-20 minutes (+ prerequisites if auto-installing)
 **Output:** Complete SOC lab ready for use
+
+**Examples:**
+```bash
+./cyberblue_init.sh                           # Normal installation (requires prerequisites)
+./cyberblue_init.sh --install-prerequisites   # One-command installation with auto-prerequisites
+```
+
+---
+
+### `install-prerequisites.sh` 🚀
+**Prerequisites installation script for CyberBlue SOC platform**
+
+```bash
+./install-prerequisites.sh [OPTIONS]
+```
+
+**Options:**
+- `--skip-updates` - Skip system updates (faster, but not recommended)
+- `--force` - Skip confirmation prompts
+- `--help` - Show help message
+
+**Purpose:** Installs all required prerequisites for CyberBlue SOC
+**Features:**
+- 🐳 Docker CE installation (latest stable)
+- 📦 Docker Compose installation (latest)
+- ⚙️ System optimizations (sysctl, limits)
+- 🌐 Network configurations (iptables, Docker daemon)
+- 👥 User permissions (Docker group)
+- 🔍 Port conflict detection
+- ✅ Installation verification
+
+**Runtime:** ~5-10 minutes
+**Requirements:** Ubuntu/Debian-based system with internet connection
+
+**Examples:**
+```bash
+./install-prerequisites.sh                    # Interactive installation
+./install-prerequisites.sh --force            # Non-interactive installation
+./install-prerequisites.sh --skip-updates     # Skip system updates (faster)
+```
 
 ---
 
@@ -347,9 +392,16 @@ This document provides comprehensive documentation for all available scripts in 
 
 ### Fresh Installation
 ```bash
-# Complete fresh installation
-./cleanup-fresh-install.sh --force
+# Method 1: One-command installation (recommended for new users)
+./cyberblue_init.sh --install-prerequisites
+
+# Method 2: Manual prerequisites (recommended for advanced users)
+./install-prerequisites.sh
 ./cyberblue_init.sh
+
+# Method 3: Complete cleanup then fresh install
+./cleanup-fresh-install.sh --force
+./cyberblue_init.sh --install-prerequisites
 ```
 
 ### Quick Restart
