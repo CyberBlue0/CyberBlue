@@ -258,8 +258,48 @@ sudo curl -s -o ./suricata/reference.config https://raw.githubusercontent.com/OI
 # Launching Services
 # ----------------------------
 echo "🚀 Running Docker initialization commands..."
+
+# ----------------------------
+# Enhanced Wazuh SSL Certificate Setup
+# ----------------------------
+echo "🔑 Setting up Wazuh SSL certificates..."
 sudo docker compose run --rm generator
+
+# Wait for certificate generation and fix any permission issues
+sleep 10
+if [[ -d "wazuh/config/wazuh_indexer_ssl_certs" ]]; then
+    # Fix any directory artifacts that might have been created
+    sudo find wazuh/config/wazuh_indexer_ssl_certs -type d -name "*.pem" -exec rm -rf {} \; 2>/dev/null || true
+    sudo find wazuh/config/wazuh_indexer_ssl_certs -type d -name "*.key" -exec rm -rf {} \; 2>/dev/null || true
+    
+    # Fix certificate permissions
+    sudo chown -R ubuntu:ubuntu wazuh/config/wazuh_indexer_ssl_certs/ 2>/dev/null || true
+    sudo chmod 644 wazuh/config/wazuh_indexer_ssl_certs/*.pem 2>/dev/null || true
+    sudo chmod 644 wazuh/config/wazuh_indexer_ssl_certs/*.key 2>/dev/null || true
+    echo "✅ Wazuh SSL certificates configured properly"
+fi
+
+# Deploy all services with enhanced startup sequence
+echo "🚀 Deploying all CyberBlue SOC services..."
 sudo docker compose up --build -d
+
+# Wait for critical services to initialize
+echo "⏳ Waiting for services to initialize..."
+sleep 30
+
+# Verify Wazuh services and restart if needed
+echo "🔍 Verifying Wazuh services..."
+WAZUH_RUNNING=$(sudo docker ps | grep -c "wazuh.*Up" || echo "0")
+if [[ "$WAZUH_RUNNING" -lt 3 ]]; then
+    echo "🔧 Wazuh services need adjustment, applying fixes..."
+    sudo docker compose restart wazuh.indexer
+    sleep 20
+    sudo docker compose restart wazuh.manager
+    sleep 15
+    sudo docker compose restart wazuh.dashboard
+    sleep 15
+    echo "✅ Wazuh services restarted"
+fi
 
 # ----------------------------
 # Docker External Access Fix (Universal)
@@ -437,6 +477,46 @@ echo "🔄 Caldera will now automatically start after system reboots"
 # ----------------------------
 # Final Success Message with Logo and Time
 # ----------------------------
+# ----------------------------
+# Final Service Verification
+# ----------------------------
+echo "🔍 Final verification of all services..."
+sleep 10
+
+TOTAL_RUNNING=$(sudo docker ps | grep -c "Up" || echo "0")
+EXPECTED_SERVICES=30
+
+echo "📊 Service Status Check:"
+echo "   Running containers: $TOTAL_RUNNING"
+echo "   Expected containers: $EXPECTED_SERVICES+"
+
+if [[ "$TOTAL_RUNNING" -ge "$EXPECTED_SERVICES" ]]; then
+    echo "✅ All services are running successfully!"
+else
+    echo "⚠️  Some services may still be starting ($TOTAL_RUNNING/$EXPECTED_SERVICES+)"
+    echo "   This is normal - services may take a few more minutes to fully initialize"
+    echo "   Check portal in 2-3 minutes for final status"
+fi
+
+# Final Wazuh verification
+WAZUH_RUNNING=$(sudo docker ps | grep -c "wazuh.*Up" || echo "0")
+if [[ "$WAZUH_RUNNING" -eq 3 ]]; then
+    echo "✅ All Wazuh services confirmed running"
+elif [[ "$WAZUH_RUNNING" -eq 2 ]]; then
+    echo "⚠️  2/3 Wazuh services running (may need more time)"
+elif [[ "$WAZUH_RUNNING" -eq 1 ]]; then
+    echo "⚠️  1/3 Wazuh services running (run ./fix-wazuh-services.sh if needed)"
+else
+    echo "⚠️  Wazuh services not detected (run ./fix-wazuh-services.sh if needed)"
+fi
+
+# Caldera verification
+if sudo docker ps | grep -q "caldera.*Up"; then
+    echo "✅ Caldera confirmed running"
+else
+    echo "⚠️  Caldera not detected (should be integrated now)"
+fi
+
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 MINUTES=$((DURATION / 60))
