@@ -240,68 +240,35 @@ echo "🚀 Ready to clone and deploy CyberBlue SOC"
 
 **💡 Note**: The `newgrp docker` command usually eliminates the need to logout/login. If Docker commands still require `sudo`, then logout/login is needed.
 
-### ⚡ Installation Options
+### ⚡ Simple Installation (Choose One)
 
-**Choose your preferred installation method:**
+**Two simple methods that work everywhere:**
 
-#### 🎯 **Method 1: Simple Installation (Recommended - No Hanging, No Logout)**
+#### 🎯 **Method 1: Complete Installer (Recommended)**
 ```bash
-# Clone the repository
+# Clone and install everything in one go
 git clone https://github.com/CyberBlue0/CyberBlue.git
 cd CyberBlue
-
-# Simple installer - handles sudo upfront, no hanging, no logout required
-chmod +x install-cyberblue-simple.sh
-./install-cyberblue-simple.sh
+chmod +x install-cyberblue-final.sh
+./install-cyberblue-final.sh
 ```
+**✅ Handles everything: Prerequisites, Docker, all services**
+**✅ No hanging, no logout required, bulletproof**
 
-#### 🚀 **Method 2: Foolproof Installation (Alternative)**
+#### 🔧 **Method 2: Manual Prerequisites (Advanced Users)**
 ```bash
 # Clone the repository
 git clone https://github.com/CyberBlue0/CyberBlue.git
 cd CyberBlue
 
-# One command handles everything (prerequisites + Docker group + CyberBlue)
-chmod +x install-cyberblue.sh
-./install-cyberblue.sh
-```
-
-#### 🔧 **Method 3: One-Command with Manual Prerequisites Flag**
-```bash
-# Clone the repository
-git clone https://github.com/CyberBlue0/CyberBlue.git
-cd CyberBlue
-
-# One command installs everything (prerequisites + CyberBlue)
-chmod +x cyberblue_init.sh install-prerequisites.sh
-./cyberblue_init.sh --install-prerequisites
-```
-
-#### 🔧 **Method 4: Manual Prerequisites (Recommended for Advanced Users)**
-```bash
-# Clone the repository
-git clone https://github.com/CyberBlue0/CyberBlue.git
-cd CyberBlue
-
-# Step 1: Install prerequisites manually
-chmod +x install-prerequisites.sh
-./install-prerequisites.sh
-
+# Step 1: Install prerequisites manually (copy the prerequisites block above)
 # Step 2: Run CyberBlue initialization
 chmod +x cyberblue_init.sh
 ./cyberblue_init.sh
 ```
+**✅ Manual control, use prerequisites block above**
 
-#### 📋 **Method 5: Copy-Paste Prerequisites (Legacy)**
-```bash
-# Use the complete prerequisites setup block above, then:
-git clone https://github.com/CyberBlue0/CyberBlue.git
-cd CyberBlue
-chmod +x cyberblue_init.sh
-./cyberblue_init.sh
-```
-
-**💡 All methods work on all platforms (AWS, VMware, VirtualBox, bare metal).**
+**💡 Both methods work on all platforms (AWS, VMware, VirtualBox, bare metal) and deliver 15/15 services.**
 
 ### 🔍 **Enhanced Arkime Operations**
 

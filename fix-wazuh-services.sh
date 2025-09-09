@@ -59,9 +59,18 @@ log_info "Step 3: Cleaning Docker volumes for fresh certificate generation..."
 sudo docker volume rm $(sudo docker volume ls -q | grep -E "(wazuh|cert)") 2>/dev/null || true
 log "Docker volumes cleaned"
 
+# Function to run Docker Compose (handles both v1 and v2)
+docker_compose() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        sudo docker-compose "$@"
+    else
+        sudo docker compose "$@"
+    fi
+}
+
 # Step 4: Generate fresh certificates
 log_info "Step 4: Generating fresh SSL certificates..."
-sudo docker-compose up -d generator
+docker_compose up -d generator
 log_info "Waiting for certificate generation to complete (30 seconds)..."
 sleep 30
 
@@ -90,7 +99,7 @@ log_info "Step 6: Starting Wazuh services in proper order..."
 
 # Start indexer first
 log_info "Starting Wazuh Indexer..."
-sudo docker-compose up -d wazuh.indexer
+docker_compose up -d wazuh.indexer
 log_info "Waiting for Wazuh Indexer to initialize (45 seconds)..."
 sleep 45
 
@@ -103,7 +112,7 @@ fi
 
 # Start manager
 log_info "Starting Wazuh Manager..."
-sudo docker-compose up -d wazuh.manager
+docker_compose up -d wazuh.manager
 log_info "Waiting for Wazuh Manager to initialize (30 seconds)..."
 sleep 30
 
@@ -117,7 +126,7 @@ fi
 
 # Start dashboard
 log_info "Starting Wazuh Dashboard..."
-sudo docker-compose up -d wazuh.dashboard
+docker_compose up -d wazuh.dashboard
 log_info "Waiting for Wazuh Dashboard to initialize (45 seconds)..."
 sleep 45
 

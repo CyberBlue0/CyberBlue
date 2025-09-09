@@ -89,12 +89,21 @@ EOF
 echo "[+] Building and starting Caldera with docker-compose..."
 cd "$SCRIPT_DIR" || { echo "[-] Failed to cd into $SCRIPT_DIR"; exit 1; }
 
+# Function to run Docker Compose (handles both v1 and v2)
+docker_compose() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        sudo docker-compose "$@"
+    else
+        sudo docker compose "$@"
+    fi
+}
+
 # Stop any existing Caldera container
-sudo docker-compose stop caldera 2>/dev/null || true
-sudo docker-compose rm -f caldera 2>/dev/null || true
+docker_compose stop caldera 2>/dev/null || true
+docker_compose rm -f caldera 2>/dev/null || true
 
 # Build and start Caldera
-sudo docker-compose up -d caldera
+docker_compose up -d caldera
 
 HOST_PORT="${PORT_MAPPING%%:*}"
 echo "[✓] Caldera is running in the background on http://localhost:$HOST_PORT"
