@@ -244,7 +244,18 @@ echo "🚀 Ready to clone and deploy CyberBlue SOC"
 
 **Choose your preferred installation method:**
 
-#### 🎯 **Method 1: Foolproof Installation (Recommended for New Users)**
+#### 🎯 **Method 1: Simple Installation (Recommended - No Hanging, No Logout)**
+```bash
+# Clone the repository
+git clone https://github.com/CyberBlue0/CyberBlue.git
+cd CyberBlue
+
+# Simple installer - handles sudo upfront, no hanging, no logout required
+chmod +x install-cyberblue-simple.sh
+./install-cyberblue-simple.sh
+```
+
+#### 🚀 **Method 2: Foolproof Installation (Alternative)**
 ```bash
 # Clone the repository
 git clone https://github.com/CyberBlue0/CyberBlue.git
@@ -255,7 +266,7 @@ chmod +x install-cyberblue.sh
 ./install-cyberblue.sh
 ```
 
-#### 🔧 **Method 2: One-Command with Manual Prerequisites Flag**
+#### 🔧 **Method 3: One-Command with Manual Prerequisites Flag**
 ```bash
 # Clone the repository
 git clone https://github.com/CyberBlue0/CyberBlue.git
@@ -266,7 +277,7 @@ chmod +x cyberblue_init.sh install-prerequisites.sh
 ./cyberblue_init.sh --install-prerequisites
 ```
 
-#### 🔧 **Method 3: Manual Prerequisites (Recommended for Advanced Users)**
+#### 🔧 **Method 4: Manual Prerequisites (Recommended for Advanced Users)**
 ```bash
 # Clone the repository
 git clone https://github.com/CyberBlue0/CyberBlue.git
@@ -281,7 +292,7 @@ chmod +x cyberblue_init.sh
 ./cyberblue_init.sh
 ```
 
-#### 📋 **Method 4: Copy-Paste Prerequisites (Legacy)**
+#### 📋 **Method 5: Copy-Paste Prerequisites (Legacy)**
 ```bash
 # Use the complete prerequisites setup block above, then:
 git clone https://github.com/CyberBlue0/CyberBlue.git

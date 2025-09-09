@@ -162,12 +162,12 @@ check_docker_installed() {
 install_basic_packages() {
     if [[ "$SKIP_UPDATES" == "false" ]]; then
         log_info "Updating system packages..."
-        sudo apt update >/dev/null 2>&1
-        DEBIAN_FRONTEND=noninteractive sudo apt upgrade -y >/dev/null 2>&1
+        timeout 300 sudo apt update >/dev/null 2>&1 || log_warn "apt update timed out"
+        timeout 600 sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y >/dev/null 2>&1 || log_warn "apt upgrade timed out"
         log "System updated successfully"
     else
         log_warn "Skipping system updates (--skip-updates specified)"
-        sudo apt update >/dev/null 2>&1
+        timeout 300 sudo apt update >/dev/null 2>&1 || log_warn "apt update timed out"
     fi
     
     log_info "Installing basic packages..."
@@ -187,8 +187,11 @@ install_docker() {
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
     
     # Install Docker
-    sudo apt update >/dev/null 2>&1
-    DEBIAN_FRONTEND=noninteractive sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1
+    timeout 300 sudo apt update >/dev/null 2>&1 || log_warn "apt update timed out"
+    timeout 600 sudo DEBIAN_FRONTEND=noninteractive apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1 || {
+        log_error "Docker installation failed or timed out"
+        exit 1
+    }
     
     log "Docker CE installed successfully"
 }

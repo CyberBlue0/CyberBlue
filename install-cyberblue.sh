@@ -44,6 +44,14 @@ check_docker_access() {
 
 echo -e "${CYAN}🔍 Checking current system state...${NC}"
 
+# Verify sudo access upfront
+echo "🔐 Verifying sudo access..."
+if ! sudo -n true 2>/dev/null; then
+    echo "Please enter your password for sudo access:"
+    sudo true
+fi
+echo "✅ Sudo access confirmed"
+
 # Check if prerequisites are needed
 if ! command -v docker >/dev/null 2>&1; then
     echo "📦 Installing prerequisites..."
