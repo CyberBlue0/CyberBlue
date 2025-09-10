@@ -458,6 +458,33 @@ apply_docker_networking_fixes() {
                             echo "   ⚠️  Package update timed out, trying anyway..."
                         fi
                         
+                        # Step 5.5: Pre-installation diagnostics
+                        echo "   🔍 Running pre-installation diagnostics..."
+                        
+                        # Check if package is available
+                        if apt-cache show iptables-persistent >/dev/null 2>&1; then
+                            echo "   ✅ iptables-persistent package found in repositories"
+                        else
+                            echo "   ❌ iptables-persistent package not found - this explains the failure!"
+                            echo "   📥 Adding universe repository..."
+                            sudo add-apt-repository universe -y >/dev/null 2>&1 || true
+                            sudo apt update >/dev/null 2>&1 || true
+                        fi
+                        
+                        # Check disk space
+                        local available_space=$(df /var/cache/apt/archives | tail -1 | awk '{print $4}')
+                        if [ "$available_space" -lt 50000 ]; then
+                            echo "   ⚠️  Low disk space: ${available_space}KB available"
+                        else
+                            echo "   ✅ Sufficient disk space: ${available_space}KB available"
+                        fi
+                        
+                        # Check for broken packages
+                        if dpkg -l | grep -q "^iU\|^iF"; then
+                            echo "   🔧 Fixing broken packages..."
+                            sudo apt --fix-broken install -y >/dev/null 2>&1 || true
+                        fi
+                        
                         # Step 6: Install with multiple layers of non-interactive protection
                         echo "   📦 Installing iptables-persistent..."
                         export DEBIAN_FRONTEND=noninteractive
@@ -466,46 +493,103 @@ apply_docker_networking_fixes() {
                         # Install expect if not available (lightweight and essential for prompt handling)
                         if ! command -v expect >/dev/null 2>&1; then
                             echo "   📥 Installing expect for prompt handling..."
-                            timeout 30 sudo apt install -y expect >/dev/null 2>&1 || true
+                            if timeout 30 sudo apt install -y expect >/dev/null 2>&1; then
+                                echo "   ✅ expect installed successfully"
+                            else
+                                echo "   ⚠️  expect installation failed, using fallback method"
+                            fi
                         fi
                         
-                        # Use expect to handle any remaining prompts, with fallback to timeout
+                        # Create a temporary log file for detailed error reporting
+                        local install_log=$(mktemp /tmp/iptables-persistent-install.XXXXXX)
+                        local install_success=false
+                        
+                        # Method 1: Try with expect if available
                         if command -v expect >/dev/null 2>&1; then
-                            # Method 1: Using expect for ultimate prompt handling
-                            timeout 45 expect -c "
+                            echo "   🎯 Using expect method for installation..."
+                            if timeout 60 expect -c "
+                                log_file $install_log
                                 spawn sudo -E apt install -y iptables-persistent
                                 expect {
-                                    \"*Save current*\" { send \"y\r\"; exp_continue }
-                                    \"*keep the local*\" { send \"y\r\"; exp_continue }
-                                    \"*install the package*\" { send \"y\r\"; exp_continue }
-                                    eof
+                                    \"*Save current*\" { 
+                                        send \"y\r\"
+                                        exp_continue 
+                                    }
+                                    \"*keep the local*\" { 
+                                        send \"y\r\"
+                                        exp_continue 
+                                    }
+                                    \"*install the package*\" { 
+                                        send \"y\r\"
+                                        exp_continue 
+                                    }
+                                    \"*Do you want to continue*\" {
+                                        send \"y\r\"
+                                        exp_continue
+                                    }
+                                    \"Reading package lists\" {
+                                        exp_continue
+                                    }
+                                    \"Building dependency tree\" {
+                                        exp_continue
+                                    }
+                                    \"Setting up\" {
+                                        exp_continue
+                                    }
+                                    eof {
+                                        exit 0
+                                    }
+                                    timeout {
+                                        exit 1
+                                    }
                                 }
-                            " >/dev/null 2>&1
-                        else
-                            # Method 2: Enhanced timeout with process monitoring
-                            (
-                                timeout 45 sudo -E apt install -y iptables-persistent >/dev/null 2>&1 &
-                                local apt_pid=$!
-                                
-                                # Monitor the process and kill if it gets stuck
-                                for i in {1..45}; do
-                                    if ! kill -0 $apt_pid 2>/dev/null; then
-                                        break  # Process finished
-                                    fi
-                                    
-                                    # Check if process is stuck (no CPU activity)
-                                    if [ $i -gt 10 ] && [ $((i % 5)) -eq 0 ]; then
-                                        local cpu_usage=$(ps -p $apt_pid -o %cpu= 2>/dev/null | tr -d ' ')
-                                        if [ "${cpu_usage%.*}" = "0" ]; then
-                                            echo "   ⚠️  Process appears stuck, forcing termination..."
-                                            sudo kill -9 $apt_pid >/dev/null 2>&1 || true
-                                            break
-                                        fi
-                                    fi
-                                    sleep 1
-                                done
-                            )
+                            " 2>&1; then
+                                install_success=true
+                                echo "   ✅ expect method succeeded"
+                            else
+                                echo "   ⚠️  expect method failed, trying alternative..."
+                            fi
                         fi
+                        
+                        # Method 2: Direct installation with verbose logging if expect failed
+                        if [ "$install_success" = false ]; then
+                            echo "   🔧 Using direct installation method..."
+                            
+                            # Try the most straightforward approach with full logging
+                            if sudo -E apt install -y iptables-persistent 2>&1 | tee "$install_log"; then
+                                install_success=true
+                                echo "   ✅ Direct installation succeeded"
+                            else
+                                echo "   ❌ Direct installation failed"
+                            fi
+                        fi
+                        
+                        # Method 3: Force installation if previous methods failed
+                        if [ "$install_success" = false ]; then
+                            echo "   🚀 Trying force installation method..."
+                            
+                            # Download and install manually
+                            if sudo apt download iptables-persistent 2>&1 | tee -a "$install_log" && \
+                               sudo dpkg -i --force-confnew iptables-persistent*.deb 2>&1 | tee -a "$install_log"; then
+                                install_success=true
+                                echo "   ✅ Force installation succeeded"
+                                # Clean up downloaded package
+                                rm -f iptables-persistent*.deb
+                            else
+                                echo "   ❌ Force installation also failed"
+                            fi
+                        fi
+                        
+                        # Show detailed error information if all methods failed
+                        if [ "$install_success" = false ] && [ -f "$install_log" ]; then
+                            echo "   📋 Installation error details:"
+                            echo "   ================================================"
+                            tail -20 "$install_log" | sed 's/^/   | /'
+                            echo "   ================================================"
+                        fi
+                        
+                        # Clean up log file
+                        rm -f "$install_log" 2>/dev/null || true
                         
                         # Step 7: Verify installation
                         if dpkg -l | grep -q iptables-persistent; then
@@ -521,12 +605,17 @@ apply_docker_networking_fixes() {
                         fi
                     done
                     
-                    echo "   ❌ All installation attempts failed, continuing without persistence"
+                    echo "   ⚠️  All installation attempts failed - this is not critical"
+                    echo "   ℹ️  iptables rules will work but won't persist after reboot"
+                    echo "   ➡️  You can manually install later with: sudo apt install iptables-persistent"
                     return 1
                 }
                 
-                # Call the robust installation function
-                install_iptables_persistent
+                # Call the robust installation function (continue regardless of outcome)
+                install_iptables_persistent || {
+                    echo "   ℹ️  iptables-persistent installation was not successful"
+                    echo "   ➡️  Continuing with script execution..."
+                }
             fi
             
             if dpkg -l | grep -q iptables-persistent; then
@@ -542,6 +631,9 @@ apply_docker_networking_fixes() {
     else
         echo "⚠️  No Docker bridges found - rules will be applied when containers start"
     fi
+    
+    echo ""
+    echo "🚀 Docker networking configuration finished - continuing with service setup..."
 }
 
 # Apply the fixes
