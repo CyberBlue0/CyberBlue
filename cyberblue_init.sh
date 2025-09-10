@@ -258,12 +258,19 @@ grep "^SURICATA_INT=" .env
 # Suricata Rule Setup
 # ----------------------------
 echo "📦 Downloading Emerging Threats rules..."
+echo "   This may take 1-2 minutes - downloading rule sets..."
 sudo mkdir -p ./suricata/rules
 if [ ! -f ./suricata/emerging.rules.tar.gz ]; then
-    if sudo curl -s -O https://rules.emergingthreats.net/open/suricata-6.0/emerging.rules.tar.gz; then
-    sudo tar -xzf emerging.rules.tar.gz -C ./suricata/rules --strip-components=1
-    sudo rm emerging.rules.tar.gz
-        echo "✅ Suricata rules downloaded and extracted successfully"
+    echo "   Downloading Emerging Threats ruleset..."
+    if sudo curl --progress-bar -O https://rules.emergingthreats.net/open/suricata-6.0/emerging.rules.tar.gz; then
+        echo "   ✅ Rules downloaded, extracting..."
+        if sudo tar -xzf emerging.rules.tar.gz -C ./suricata/rules --strip-components=1; then
+            echo "   ✅ Rules extracted successfully"
+            sudo rm emerging.rules.tar.gz
+            echo "✅ Suricata rules downloaded and extracted successfully"
+        else
+            echo "   ⚠️  Failed to extract rules - continuing anyway"
+        fi
     else
         echo "⚠️  Failed to download Suricata rules (network issue?) - continuing without rules"
         echo "   Suricata will work but with limited rule coverage"
@@ -274,11 +281,17 @@ fi
 
 # Download config files
 echo "📥 Downloading Suricata configuration files..."
-if ! sudo curl -s -o ./suricata/classification.config https://raw.githubusercontent.com/OISF/suricata/master/etc/classification.config; then
+echo "   Downloading classification.config..."
+if ! sudo curl --progress-bar -o ./suricata/classification.config https://raw.githubusercontent.com/OISF/suricata/master/etc/classification.config; then
     echo "⚠️  Failed to download classification.config - continuing anyway"
+else
+    echo "   ✅ classification.config downloaded"
 fi
-if ! sudo curl -s -o ./suricata/reference.config https://raw.githubusercontent.com/OISF/suricata/master/etc/reference.config; then
+echo "   Downloading reference.config..."
+if ! sudo curl --progress-bar -o ./suricata/reference.config https://raw.githubusercontent.com/OISF/suricata/master/etc/reference.config; then
     echo "⚠️  Failed to download reference.config - continuing anyway"
+else
+    echo "   ✅ reference.config downloaded"
 fi
 
 # ----------------------------
@@ -292,9 +305,16 @@ echo "🚀 Running Docker initialization commands..."
 echo "🧠 Verifying Caldera setup..."
 if [[ ! -d "./caldera" ]]; then
     echo "📦 Caldera directory not found, running Caldera installation..."
+    echo "   This may take 1-2 minutes - downloading and setting up Caldera..."
     if [[ -f "./install_caldera.sh" ]]; then
         chmod +x ./install_caldera.sh
-        ./install_caldera.sh
+        if timeout 180 ./install_caldera.sh 2>&1 | while read line; do
+            echo "   Caldera: $line"
+        done; then
+            echo "   ✅ Caldera installation completed successfully"
+        else
+            echo "   ⚠️  Caldera installation timed out or failed - continuing anyway"
+        fi
     else
         echo "⚠️  install_caldera.sh not found, Caldera will be skipped"
     fi
@@ -306,9 +326,14 @@ fi
 # Enhanced Wazuh SSL Certificate Setup
 # ----------------------------
 echo "🔑 Setting up Wazuh SSL certificates..."
-if ! sudo docker compose run --rm generator; then
+echo "   This may take 30-60 seconds - generating certificates..."
+if ! sudo docker compose run --rm generator 2>&1 | while read line; do
+    echo "   SSL Gen: $line"
+done; then
     echo "⚠️  Certificate generation failed - trying to continue anyway"
     echo "   Wazuh services may have certificate issues"
+else
+    echo "✅ Wazuh SSL certificates generated successfully"
 fi
 
 # Wait for certificate generation and fix any permission issues
@@ -358,11 +383,16 @@ echo ""
 
 # Deploy all services with enhanced startup sequence
 echo "🚀 Deploying all CyberBlue SOC services with clean iptables chains..."
-if ! sudo docker compose up --build -d; then
+echo "   This may take 2-5 minutes - building and starting 30+ containers..."
+if ! sudo docker compose up --build -d 2>&1 | while read line; do
+    echo "   Deploy: $line"
+done; then
     echo "❌ Critical failure: Docker Compose deployment failed!"
     echo "   This is a critical error that prevents SOC platform startup"
     echo "   Please check Docker installation and try again"
     exit 1
+else
+    echo "✅ All containers deployed successfully"
 fi
 
 echo "⏳ Waiting for initial container startup (60 seconds)..."
@@ -405,13 +435,28 @@ echo "🔍 Verifying Wazuh services..."
 WAZUH_RUNNING=$(sudo docker ps | grep -c "wazuh.*Up" || echo "0")
 if [[ "$WAZUH_RUNNING" -lt 3 ]]; then
     echo "🔧 Wazuh services need adjustment, applying fixes..."
-    sudo docker compose restart wazuh.indexer || echo "⚠️  Failed to restart wazuh.indexer"
+    echo "   Restarting wazuh.indexer..."
+    if sudo docker compose restart wazuh.indexer 2>&1 | while read line; do echo "   Indexer: $line"; done; then
+        echo "   ✅ wazuh.indexer restarted successfully"
+    else
+        echo "   ⚠️  Failed to restart wazuh.indexer"
+    fi
     sleep 20
-    sudo docker compose restart wazuh.manager || echo "⚠️  Failed to restart wazuh.manager"
+    echo "   Restarting wazuh.manager..."
+    if sudo docker compose restart wazuh.manager 2>&1 | while read line; do echo "   Manager: $line"; done; then
+        echo "   ✅ wazuh.manager restarted successfully"
+    else
+        echo "   ⚠️  Failed to restart wazuh.manager"
+    fi
     sleep 15
-    sudo docker compose restart wazuh.dashboard || echo "⚠️  Failed to restart wazuh.dashboard"
+    echo "   Restarting wazuh.dashboard..."
+    if sudo docker compose restart wazuh.dashboard 2>&1 | while read line; do echo "   Dashboard: $line"; done; then
+        echo "   ✅ wazuh.dashboard restarted successfully"
+    else
+        echo "   ⚠️  Failed to restart wazuh.dashboard"
+    fi
     sleep 15
-    echo "✅ Wazuh services restart attempted"
+    echo "✅ Wazuh services restart completed"
 fi
 
 # Function to detect primary network interface (reuse existing logic)
@@ -758,18 +803,28 @@ apply_docker_networking_fixes
 # Now proceed with service-specific configurations
 echo ""
 echo "🔧 Configuring Fleet database..."
-if ! sudo docker run --rm \
+echo "   This may take 30-60 seconds - please wait..."
+if ! timeout 120 sudo docker run --rm \
   --network=cyber-blue \
   -e FLEET_MYSQL_ADDRESS=fleet-mysql:3306 \
   -e FLEET_MYSQL_USERNAME=fleet \
   -e FLEET_MYSQL_PASSWORD=fleetpass \
   -e FLEET_MYSQL_DATABASE=fleet \
-  fleetdm/fleet:latest fleet prepare db; then
-    echo "⚠️  Fleet database preparation failed - Fleet may not work properly"
+  fleetdm/fleet:latest fleet prepare db 2>&1 | while read line; do
+    echo "   Fleet DB: $line"
+  done; then
+    echo "✅ Fleet database configured successfully"
+else
+    echo "⚠️  Fleet database preparation failed or timed out - Fleet may not work properly"
 fi
 
-if ! sudo docker compose up -d fleet-server; then
+echo "🚀 Starting Fleet server..."
+if ! sudo docker compose up -d fleet-server 2>&1 | while read line; do
+    echo "   Fleet: $line"
+done; then
     echo "⚠️  Failed to start fleet-server - continuing anyway"
+else
+    echo "✅ Fleet server started successfully"
 fi
 
 # ----------------------------
@@ -780,34 +835,47 @@ echo "================================================"
 
 # Run the dedicated Arkime fix script with 30-second live capture
 echo "🚀 Running enhanced Arkime setup with 30-second live capture..."
+echo "   This may take 1-2 minutes - you'll see progress output..."
 if [ -f "./fix-arkime.sh" ]; then
     chmod +x ./fix-arkime.sh
-    ./fix-arkime.sh --live-30s
-    
-    if [ $? -eq 0 ]; then
+    echo "   Starting Arkime initialization script..."
+    if timeout 180 ./fix-arkime.sh --live-30s 2>&1 | while read line; do
+        echo "   Arkime: $line"
+    done; then
         echo "✅ Arkime setup completed successfully!"
     else
-        echo "⚠️  Arkime setup completed with warnings"
+        echo "⚠️  Arkime setup timed out or completed with warnings"
+        echo "   Falling back to basic setup..."
+        # Fallback: Basic Arkime user creation
+        echo "👤 Creating Arkime admin user..."
+        timeout 30 sudo docker exec arkime /opt/arkime/bin/arkime_add_user.sh admin "CyberBlue Admin" admin --admin 2>/dev/null || echo "   Admin user ready"
     fi
 else
     echo "⚠️  fix-arkime.sh not found, using basic setup..."
     
     # Fallback: Basic Arkime user creation
     echo "👤 Creating Arkime admin user..."
-    sudo docker exec arkime /opt/arkime/bin/arkime_add_user.sh admin "CyberBlue Admin" admin --admin 2>/dev/null || echo "Admin user ready"
-    
-    echo "🌐 Access Arkime at: http://$(hostname -I | awk '{print $1}'):7008"
-    echo "👤 Login credentials: admin / admin"
+    timeout 30 sudo docker exec arkime /opt/arkime/bin/arkime_add_user.sh admin "CyberBlue Admin" admin --admin 2>/dev/null || echo "   Admin user ready"
 fi
+
+echo "🌐 Access Arkime at: http://$(hostname -I | awk '{print $1}'):7008"
+echo "👤 Login credentials: admin / admin"
 
 echo ""
 
 # ----------------------------
 # Caldera Setup
 # ----------------------------
-echo "🧠 Installing Caldera in the background..."
+echo "🧠 Final Caldera setup and verification..."
+echo "   Ensuring Caldera is properly configured..."
 chmod +x ./install_caldera.sh
-./install_caldera.sh
+if timeout 120 ./install_caldera.sh 2>&1 | while read line; do
+    echo "   Caldera: $line"
+done; then
+    echo "✅ Caldera final setup completed"
+else
+    echo "⚠️  Caldera final setup completed with warnings"
+fi
 
 # Wait until Caldera is fully running on port 7009
 echo "⏳ Waiting for Caldera to become available on port 7009..."
