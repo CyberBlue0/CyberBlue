@@ -418,14 +418,115 @@ apply_docker_networking_fixes() {
         if command -v iptables-save >/dev/null 2>&1; then
             if ! dpkg -l | grep -q iptables-persistent; then
                 echo "📦 Installing iptables-persistent for rule persistence..."
-                sudo apt update >/dev/null 2>&1
-                # Pre-seed debconf to avoid interactive prompts
-                echo "iptables-persistent iptables-persistent/autosave_v4 boolean true" | sudo debconf-set-selections
-                echo "iptables-persistent iptables-persistent/autosave_v6 boolean true" | sudo debconf-set-selections
-                # Install with non-interactive frontend and timeout protection
-                timeout 60 sudo DEBIAN_FRONTEND=noninteractive apt install -y iptables-persistent >/dev/null 2>&1 || {
-                    echo "⚠️ iptables-persistent installation timed out or failed, continuing without persistence"
+                
+                # Enhanced robust installation function
+                install_iptables_persistent() {
+                    local max_attempts=3
+                    local attempt=1
+                    
+                    while [ $attempt -le $max_attempts ]; do
+                        echo "   🔄 Installation attempt $attempt/$max_attempts..."
+                        
+                        # Step 1: Check for and kill any stuck apt processes
+                        if pgrep -f "apt.*iptables-persistent" >/dev/null 2>&1; then
+                            echo "   🧹 Cleaning up stuck apt processes..."
+                            sudo pkill -f "apt.*iptables-persistent" >/dev/null 2>&1 || true
+                            sleep 2
+                        fi
+                        
+                        # Step 2: Clear apt locks if they exist
+                        if [ -f /var/lib/dpkg/lock-frontend ]; then
+                            echo "   🔓 Clearing apt locks..."
+                            sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock >/dev/null 2>&1 || true
+                        fi
+                        
+                        # Step 3: Fix any broken dpkg state
+                        sudo dpkg --configure -a >/dev/null 2>&1 || true
+                        
+                        # Step 4: Enhanced debconf pre-seeding with proper escaping
+                        echo "   ⚙️  Configuring package pre-selections..."
+                        {
+                            echo "iptables-persistent iptables-persistent/autosave_v4 boolean true"
+                            echo "iptables-persistent iptables-persistent/autosave_v6 boolean true"
+                        } | sudo debconf-set-selections
+                        
+                        # Step 5: Update package lists with timeout
+                        echo "   📥 Updating package lists..."
+                        if timeout 30 sudo apt update >/dev/null 2>&1; then
+                            echo "   ✅ Package lists updated successfully"
+                        else
+                            echo "   ⚠️  Package update timed out, trying anyway..."
+                        fi
+                        
+                        # Step 6: Install with multiple layers of non-interactive protection
+                        echo "   📦 Installing iptables-persistent..."
+                        export DEBIAN_FRONTEND=noninteractive
+                        export DEBCONF_NONINTERACTIVE_SEEN=true
+                        
+                        # Install expect if not available (lightweight and essential for prompt handling)
+                        if ! command -v expect >/dev/null 2>&1; then
+                            echo "   📥 Installing expect for prompt handling..."
+                            timeout 30 sudo apt install -y expect >/dev/null 2>&1 || true
+                        fi
+                        
+                        # Use expect to handle any remaining prompts, with fallback to timeout
+                        if command -v expect >/dev/null 2>&1; then
+                            # Method 1: Using expect for ultimate prompt handling
+                            timeout 45 expect -c "
+                                spawn sudo -E apt install -y iptables-persistent
+                                expect {
+                                    \"*Save current*\" { send \"y\r\"; exp_continue }
+                                    \"*keep the local*\" { send \"y\r\"; exp_continue }
+                                    \"*install the package*\" { send \"y\r\"; exp_continue }
+                                    eof
+                                }
+                            " >/dev/null 2>&1
+                        else
+                            # Method 2: Enhanced timeout with process monitoring
+                            (
+                                timeout 45 sudo -E apt install -y iptables-persistent >/dev/null 2>&1 &
+                                local apt_pid=$!
+                                
+                                # Monitor the process and kill if it gets stuck
+                                for i in {1..45}; do
+                                    if ! kill -0 $apt_pid 2>/dev/null; then
+                                        break  # Process finished
+                                    fi
+                                    
+                                    # Check if process is stuck (no CPU activity)
+                                    if [ $i -gt 10 ] && [ $((i % 5)) -eq 0 ]; then
+                                        local cpu_usage=$(ps -p $apt_pid -o %cpu= 2>/dev/null | tr -d ' ')
+                                        if [ "${cpu_usage%.*}" = "0" ]; then
+                                            echo "   ⚠️  Process appears stuck, forcing termination..."
+                                            sudo kill -9 $apt_pid >/dev/null 2>&1 || true
+                                            break
+                                        fi
+                                    fi
+                                    sleep 1
+                                done
+                            )
+                        fi
+                        
+                        # Step 7: Verify installation
+                        if dpkg -l | grep -q iptables-persistent; then
+                            echo "   ✅ iptables-persistent installed successfully"
+                            return 0
+                        else
+                            echo "   ⚠️  Installation attempt $attempt failed"
+                            attempt=$((attempt + 1))
+                            if [ $attempt -le $max_attempts ]; then
+                                echo "   🔄 Retrying in 3 seconds..."
+                                sleep 3
+                            fi
+                        fi
+                    done
+                    
+                    echo "   ❌ All installation attempts failed, continuing without persistence"
+                    return 1
                 }
+                
+                # Call the robust installation function
+                install_iptables_persistent
             fi
             
             if dpkg -l | grep -q iptables-persistent; then
