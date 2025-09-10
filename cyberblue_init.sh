@@ -157,7 +157,10 @@ fi
 
 # Clone MITRE ATTACK Nav.
 echo "📥 Cloning MITRE ATT&CK Navigator..."
-git clone https://github.com/mitre-attack/attack-navigator.git
+if ! git clone https://github.com/mitre-attack/attack-navigator.git; then
+    echo "⚠️  Failed to clone MITRE ATT&CK Navigator (network issue?) - continuing anyway"
+    echo "   You can manually clone it later if needed"
+fi
 
 # ----------------------------
 # Get Host IP for MISP
@@ -257,16 +260,26 @@ grep "^SURICATA_INT=" .env
 echo "📦 Downloading Emerging Threats rules..."
 sudo mkdir -p ./suricata/rules
 if [ ! -f ./suricata/emerging.rules.tar.gz ]; then
-    sudo curl -s -O https://rules.emergingthreats.net/open/suricata-6.0/emerging.rules.tar.gz
-    sudo tar -xzf emerging.rules.tar.gz -C ./suricata/rules --strip-components=1
-    sudo rm emerging.rules.tar.gz
+    if sudo curl -s -O https://rules.emergingthreats.net/open/suricata-6.0/emerging.rules.tar.gz; then
+        sudo tar -xzf emerging.rules.tar.gz -C ./suricata/rules --strip-components=1
+        sudo rm emerging.rules.tar.gz
+        echo "✅ Suricata rules downloaded and extracted successfully"
+    else
+        echo "⚠️  Failed to download Suricata rules (network issue?) - continuing without rules"
+        echo "   Suricata will work but with limited rule coverage"
+    fi
 else
     echo "ℹ️ Suricata rules archive already downloaded. Skipping."
 fi
 
 # Download config files
-sudo curl -s -o ./suricata/classification.config https://raw.githubusercontent.com/OISF/suricata/master/etc/classification.config
-sudo curl -s -o ./suricata/reference.config https://raw.githubusercontent.com/OISF/suricata/master/etc/reference.config
+echo "📥 Downloading Suricata configuration files..."
+if ! sudo curl -s -o ./suricata/classification.config https://raw.githubusercontent.com/OISF/suricata/master/etc/classification.config; then
+    echo "⚠️  Failed to download classification.config - continuing anyway"
+fi
+if ! sudo curl -s -o ./suricata/reference.config https://raw.githubusercontent.com/OISF/suricata/master/etc/reference.config; then
+    echo "⚠️  Failed to download reference.config - continuing anyway"
+fi
 
 # ----------------------------
 # Launching Services
@@ -293,7 +306,10 @@ fi
 # Enhanced Wazuh SSL Certificate Setup
 # ----------------------------
 echo "🔑 Setting up Wazuh SSL certificates..."
-sudo docker compose run --rm generator
+if ! sudo docker compose run --rm generator; then
+    echo "⚠️  Certificate generation failed - trying to continue anyway"
+    echo "   Wazuh services may have certificate issues"
+fi
 
 # Wait for certificate generation and fix any permission issues
 sleep 10
@@ -311,42 +327,18 @@ fi
 
 # Deploy all services with enhanced startup sequence
 echo "🚀 Deploying all CyberBlue SOC services..."
-sudo docker compose up --build -d
+if ! sudo docker compose up --build -d; then
+    echo "❌ Critical failure: Docker Compose deployment failed!"
+    echo "   This is a critical error that prevents SOC platform startup"
+    echo "   Please check Docker installation and try again"
+    exit 1
+fi
 
-# ===== Enhanced Docker Networking Fix =====
-echo "🔧 Ensuring Docker networking rules are properly configured..."
-echo "   This prevents common container accessibility issues and iptables chain corruption"
+echo "⏳ Waiting for initial container startup (60 seconds)..."
+sleep 60
 
-# Step 1: Clean up any existing Docker networks and rules
-echo "   🧹 Cleaning up existing Docker networks and iptables rules..."
-sudo docker network prune -f >/dev/null 2>&1 || true
-
-# Step 2: Flush and remove Docker iptables chains (prevents chain corruption)
-echo "   🔧 Flushing Docker iptables chains to prevent corruption..."
-sudo iptables -t nat -F DOCKER >/dev/null 2>&1 || true
-sudo iptables -t nat -X DOCKER >/dev/null 2>&1 || true
-sudo iptables -t filter -F DOCKER >/dev/null 2>&1 || true
-sudo iptables -t filter -F DOCKER-ISOLATION-STAGE-1 >/dev/null 2>&1 || true
-sudo iptables -t filter -F DOCKER-ISOLATION-STAGE-2 >/dev/null 2>&1 || true
-
-# Step 3: Restart Docker daemon to rebuild all chains from scratch
-echo "   🔄 Restarting Docker daemon to rebuild iptables NAT rules..."
-sudo systemctl restart docker
-
-echo "   ⏳ Waiting for Docker to fully restart and rebuild chains..."
-sleep 15
-
-# Step 4: Verify Docker is ready
-echo "   ✅ Verifying Docker daemon is ready..."
-timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done' || echo "   ⚠️ Docker verification timeout - continuing anyway"
-
-# Step 5: Restart containers with clean networking
-echo "   🚀 Restarting all containers with clean networking rules..."
-sudo docker compose up -d
-
-echo "✅ Enhanced Docker networking fix applied - iptables chain corruption prevented"
-echo ""
-# ===== End Enhanced Docker Networking Fix =====
+echo "🔧 Applying comprehensive Docker networking fixes..."
+# Note: Full networking fixes will be applied after all services are running
 
 # Wait for critical services to initialize
 echo "⏳ Waiting for services to initialize..."
@@ -357,19 +349,14 @@ echo "🔍 Verifying Wazuh services..."
 WAZUH_RUNNING=$(sudo docker ps | grep -c "wazuh.*Up" || echo "0")
 if [[ "$WAZUH_RUNNING" -lt 3 ]]; then
     echo "🔧 Wazuh services need adjustment, applying fixes..."
-    sudo docker compose restart wazuh.indexer
+    sudo docker compose restart wazuh.indexer || echo "⚠️  Failed to restart wazuh.indexer"
     sleep 20
-    sudo docker compose restart wazuh.manager
+    sudo docker compose restart wazuh.manager || echo "⚠️  Failed to restart wazuh.manager"
     sleep 15
-    sudo docker compose restart wazuh.dashboard
+    sudo docker compose restart wazuh.dashboard || echo "⚠️  Failed to restart wazuh.dashboard"
     sleep 15
-    echo "✅ Wazuh services restarted"
+    echo "✅ Wazuh services restart attempted"
 fi
-
-# ----------------------------
-# Docker External Access Fix (Universal)
-# ----------------------------
-echo "🌐 Configuring Docker external access for all platforms..."
 
 # Function to detect primary network interface (reuse existing logic)
 detect_primary_interface_for_docker() {
@@ -380,7 +367,73 @@ detect_primary_interface_for_docker() {
 
 # Function to apply Docker networking fixes
 apply_docker_networking_fixes() {
-    echo "🔧 Applying Docker external access fixes..."
+    echo "🔧 Applying comprehensive Docker external access fixes..."
+    
+    # Step 1: Check and fix Docker daemon if needed
+    if ! docker info >/dev/null 2>&1; then
+        echo "   🔄 Docker daemon not responsive, restarting..."
+        if ! sudo systemctl restart docker; then
+            echo "   ❌ Failed to restart Docker daemon - skipping networking fixes"
+            return 1
+        fi
+        sleep 15
+        timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done' || {
+            echo "   ❌ Docker daemon restart failed - skipping networking fixes"
+            return 1
+        }
+    fi
+    
+    # Step 2: Check for chain corruption and fix if needed
+    echo "   🔍 Checking for iptables chain corruption..."
+    if ! sudo iptables -t nat -L DOCKER >/dev/null 2>&1; then
+        echo "   🚨 Docker iptables chains are corrupted - rebuilding..."
+        
+        # Stop all containers temporarily
+        echo "   ⏸️  Temporarily stopping containers for chain rebuild..."
+        sudo docker compose stop >/dev/null 2>&1 || true
+        
+        # Clean up corrupted chains
+        sudo iptables -t nat -F DOCKER >/dev/null 2>&1 || true
+        sudo iptables -t nat -X DOCKER >/dev/null 2>&1 || true
+        sudo iptables -t filter -F DOCKER >/dev/null 2>&1 || true
+        sudo iptables -t filter -F DOCKER-ISOLATION-STAGE-1 >/dev/null 2>&1 || true
+        sudo iptables -t filter -F DOCKER-ISOLATION-STAGE-2 >/dev/null 2>&1 || true
+        
+        # Restart Docker to rebuild chains
+        echo "   🔄 Restarting Docker daemon to rebuild chains..."
+        if ! sudo systemctl restart docker; then
+            echo "   ❌ Failed to restart Docker daemon during chain rebuild"
+            return 1
+        fi
+        sleep 20
+        
+        # Restart containers
+        echo "   🚀 Restarting containers with clean chains..."
+        if ! sudo docker compose up -d; then
+            echo "   ❌ Failed to restart containers after chain rebuild"
+            return 1
+        fi
+        sleep 30
+        
+        echo "   ✅ Docker chains rebuilt successfully"
+    else
+        echo "   ✅ Docker iptables chains are healthy"
+    fi
+    
+    # Step 3: Wait for containers to be fully running
+    echo "   ⏳ Waiting for containers to be fully operational..."
+    local wait_time=0
+    local max_wait=120
+    while [ $wait_time -lt $max_wait ]; do
+        local running_containers=$(docker ps --format "table {{.Names}}" | grep -v "NAMES" | wc -l)
+        if [ "$running_containers" -gt 20 ]; then
+            echo "   ✅ $running_containers containers are running"
+            break
+        fi
+        sleep 10
+        wait_time=$((wait_time + 10))
+        echo "   ⏳ Still waiting... ($running_containers containers running, ${wait_time}s elapsed)"
+    done
     
     # Detect Docker bridges
     DOCKER_BRIDGES=$(ip link show | grep -E 'br-[a-f0-9]+|docker0' | awk -F': ' '{print $2}' | cut -d'@' -f1)
@@ -636,18 +689,27 @@ apply_docker_networking_fixes() {
     echo "🚀 Docker networking configuration finished - continuing with service setup..."
 }
 
-# Apply the fixes
+# Apply comprehensive networking fixes after services have started
+echo "🌐 Configuring Docker external access for all platforms..."
 detect_primary_interface_for_docker
 apply_docker_networking_fixes
 
-sudo docker run --rm \
+# Now proceed with service-specific configurations
+echo ""
+echo "🔧 Configuring Fleet database..."
+if ! sudo docker run --rm \
   --network=cyber-blue \
   -e FLEET_MYSQL_ADDRESS=fleet-mysql:3306 \
   -e FLEET_MYSQL_USERNAME=fleet \
   -e FLEET_MYSQL_PASSWORD=fleetpass \
   -e FLEET_MYSQL_DATABASE=fleet \
-  fleetdm/fleet:latest fleet prepare db
-sudo docker compose up -d fleet-server
+  fleetdm/fleet:latest fleet prepare db; then
+    echo "⚠️  Fleet database preparation failed - Fleet may not work properly"
+fi
+
+if ! sudo docker compose up -d fleet-server; then
+    echo "⚠️  Failed to start fleet-server - continuing anyway"
+fi
 
 # ----------------------------
 # Enhanced Arkime Setup using dedicated script
