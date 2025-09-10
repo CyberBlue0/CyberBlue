@@ -313,6 +313,22 @@ fi
 echo "🚀 Deploying all CyberBlue SOC services..."
 sudo docker compose up --build -d
 
+# ===== Docker Networking Fix =====
+echo "🔧 Ensuring Docker networking rules are properly configured..."
+echo "   This prevents common container accessibility issues"
+echo "   Restarting Docker daemon to rebuild iptables NAT rules..."
+sudo systemctl restart docker
+
+echo "   Waiting for Docker to fully restart..."
+sleep 10
+
+echo "   Restarting all containers with proper networking..."
+sudo docker compose up -d
+
+echo "✅ Docker networking fix applied - external access should work properly"
+echo ""
+# ===== End Docker Networking Fix =====
+
 # Wait for critical services to initialize
 echo "⏳ Waiting for services to initialize..."
 sleep 30
