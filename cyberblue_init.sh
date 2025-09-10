@@ -261,8 +261,8 @@ echo "📦 Downloading Emerging Threats rules..."
 sudo mkdir -p ./suricata/rules
 if [ ! -f ./suricata/emerging.rules.tar.gz ]; then
     if sudo curl -s -O https://rules.emergingthreats.net/open/suricata-6.0/emerging.rules.tar.gz; then
-        sudo tar -xzf emerging.rules.tar.gz -C ./suricata/rules --strip-components=1
-        sudo rm emerging.rules.tar.gz
+    sudo tar -xzf emerging.rules.tar.gz -C ./suricata/rules --strip-components=1
+    sudo rm emerging.rules.tar.gz
         echo "✅ Suricata rules downloaded and extracted successfully"
     else
         echo "⚠️  Failed to download Suricata rules (network issue?) - continuing without rules"
@@ -440,10 +440,9 @@ apply_docker_networking_fixes() {
     
     # If we get here, Docker is responsive and we can safely apply fixes
     timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done' || {
-            echo "   ❌ Docker daemon restart failed - skipping networking fixes"
-            return 1
-        }
-    fi
+        echo "   ❌ Docker daemon verification failed - skipping networking fixes"
+        return 1
+    }
     
     # Step 2: Check for chain corruption and fix if needed
     echo "   🔍 Checking for iptables chain corruption..."
