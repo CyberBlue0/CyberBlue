@@ -859,6 +859,11 @@ if [ -f "./fix-arkime.sh" ]; then
     echo "   Starting Arkime initialization script..."
     if timeout 180 ./fix-arkime.sh --live-30s 2>&1 | while read line; do
         echo "   Arkime: $line"
+        # Check if Arkime script has completed
+        if [[ "$line" == *"Arkime setup completed. Exiting"* ]]; then
+            echo "   ✅ Arkime script completed successfully"
+            break
+        fi
     done; then
         echo "✅ Arkime setup completed successfully!"
     else
