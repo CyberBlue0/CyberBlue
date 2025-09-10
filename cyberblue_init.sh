@@ -395,6 +395,24 @@ else
     echo "✅ All containers deployed successfully"
 fi
 
+# Additional Docker restart and container restart for stability
+echo "🔄 Performing additional Docker restart for optimal stability..."
+echo "   Restarting Docker daemon and containers to ensure clean networking..."
+if sudo systemctl restart docker; then
+    echo "   ✅ Docker daemon restarted successfully"
+    sleep 10
+    echo "   🚀 Restarting all containers..."
+    if sudo docker compose up -d 2>&1 | while read line; do
+        echo "   Restart: $line"
+    done; then
+        echo "✅ All containers restarted successfully with clean state"
+    else
+        echo "⚠️  Container restart completed with some warnings"
+    fi
+else
+    echo "⚠️  Docker daemon restart failed - continuing anyway"
+fi
+
 echo "⏳ Waiting for initial container startup (60 seconds)..."
 sleep 60
 
