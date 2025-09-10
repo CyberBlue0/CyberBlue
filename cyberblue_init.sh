@@ -325,8 +325,39 @@ if [[ -d "wazuh/config/wazuh_indexer_ssl_certs" ]]; then
     echo "✅ Wazuh SSL certificates configured properly"
 fi
 
+# ===== Enhanced Docker Networking Fix (BEFORE Deployment) =====
+echo "🔧 Preparing Docker networking to prevent iptables chain corruption..."
+echo "   This MUST run before container deployment to prevent networking failures"
+
+# Step 1: Clean up any existing Docker networks and rules
+echo "   🧹 Cleaning up existing Docker networks and iptables rules..."
+sudo docker network prune -f >/dev/null 2>&1 || true
+
+# Step 2: Flush and remove Docker iptables chains (prevents chain corruption)
+echo "   🔧 Flushing Docker iptables chains to prevent corruption..."
+sudo iptables -t nat -F DOCKER >/dev/null 2>&1 || true
+sudo iptables -t nat -X DOCKER >/dev/null 2>&1 || true
+sudo iptables -t filter -F DOCKER >/dev/null 2>&1 || true
+sudo iptables -t filter -F DOCKER-ISOLATION-STAGE-1 >/dev/null 2>&1 || true
+sudo iptables -t filter -F DOCKER-ISOLATION-STAGE-2 >/dev/null 2>&1 || true
+
+# Step 3: Restart Docker daemon to rebuild all chains from scratch
+echo "   🔄 Restarting Docker daemon to rebuild iptables NAT rules..."
+sudo systemctl restart docker
+
+echo "   ⏳ Waiting for Docker to fully restart and rebuild chains..."
+sleep 15
+
+# Step 4: Verify Docker is ready
+echo "   ✅ Verifying Docker daemon is ready..."
+timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done' || echo "   ⚠️ Docker verification timeout - continuing anyway"
+
+echo "✅ Docker networking prepared - chains are clean and ready for deployment"
+echo ""
+# ===== End Enhanced Docker Networking Fix =====
+
 # Deploy all services with enhanced startup sequence
-echo "🚀 Deploying all CyberBlue SOC services..."
+echo "🚀 Deploying all CyberBlue SOC services with clean iptables chains..."
 if ! sudo docker compose up --build -d; then
     echo "❌ Critical failure: Docker Compose deployment failed!"
     echo "   This is a critical error that prevents SOC platform startup"
