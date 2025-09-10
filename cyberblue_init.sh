@@ -313,21 +313,40 @@ fi
 echo "🚀 Deploying all CyberBlue SOC services..."
 sudo docker compose up --build -d
 
-# ===== Docker Networking Fix =====
+# ===== Enhanced Docker Networking Fix =====
 echo "🔧 Ensuring Docker networking rules are properly configured..."
-echo "   This prevents common container accessibility issues"
-echo "   Restarting Docker daemon to rebuild iptables NAT rules..."
+echo "   This prevents common container accessibility issues and iptables chain corruption"
+
+# Step 1: Clean up any existing Docker networks and rules
+echo "   🧹 Cleaning up existing Docker networks and iptables rules..."
+sudo docker network prune -f >/dev/null 2>&1 || true
+
+# Step 2: Flush and remove Docker iptables chains (prevents chain corruption)
+echo "   🔧 Flushing Docker iptables chains to prevent corruption..."
+sudo iptables -t nat -F DOCKER >/dev/null 2>&1 || true
+sudo iptables -t nat -X DOCKER >/dev/null 2>&1 || true
+sudo iptables -t filter -F DOCKER >/dev/null 2>&1 || true
+sudo iptables -t filter -F DOCKER-ISOLATION-STAGE-1 >/dev/null 2>&1 || true
+sudo iptables -t filter -F DOCKER-ISOLATION-STAGE-2 >/dev/null 2>&1 || true
+
+# Step 3: Restart Docker daemon to rebuild all chains from scratch
+echo "   🔄 Restarting Docker daemon to rebuild iptables NAT rules..."
 sudo systemctl restart docker
 
-echo "   Waiting for Docker to fully restart..."
-sleep 10
+echo "   ⏳ Waiting for Docker to fully restart and rebuild chains..."
+sleep 15
 
-echo "   Restarting all containers with proper networking..."
+# Step 4: Verify Docker is ready
+echo "   ✅ Verifying Docker daemon is ready..."
+timeout 30 bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done' || echo "   ⚠️ Docker verification timeout - continuing anyway"
+
+# Step 5: Restart containers with clean networking
+echo "   🚀 Restarting all containers with clean networking rules..."
 sudo docker compose up -d
 
-echo "✅ Docker networking fix applied - external access should work properly"
+echo "✅ Enhanced Docker networking fix applied - iptables chain corruption prevented"
 echo ""
-# ===== End Docker Networking Fix =====
+# ===== End Enhanced Docker Networking Fix =====
 
 # Wait for critical services to initialize
 echo "⏳ Waiting for services to initialize..."
