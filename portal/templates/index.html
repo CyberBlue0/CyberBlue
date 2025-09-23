@@ -1607,6 +1607,16 @@
                         <p class="brand-subtitle">Your Blue Team Security Hub</p>
                     </div>
                 </div>
+
+                <!-- IP Override Button -->
+                <div class="ip-override-section mt-3">
+                    <button class="btn btn-outline-light btn-sm" onclick="promptForIPOverride()"
+                        title="Override IP address for tool access">
+                        <i class="fas fa-globe me-1"></i>
+                        <span id="current-ip-display">IP: Auto</span>
+                    </button>
+                    <small class="text-muted d-block mt-1">Click to set public IP</small>
+                </div>
             </div>
 
             <!-- Mini Status Dashboard - Under Branding -->
@@ -1852,8 +1862,87 @@
 
         // Dynamic server IP detection
         function getServerIP() {
+            // Check if user has overridden the IP address
+            const overrideIP = localStorage.getItem('cyberblue_override_ip');
+            if (overrideIP && overrideIP.trim() !== '') {
+                return overrideIP.trim();
+            }
             // Return the dynamically detected server IP or fallback to window location
             return serverIP || window.location.hostname;
+        }
+
+        function promptForIPOverride() {
+            const currentIP = getServerIP();
+            const newIP = prompt(
+                `Current IP: ${currentIP}\n\nEnter new IP address for tool access:\n(Leave empty to use auto-detected IP)`,
+                currentIP
+            );
+
+            if (newIP !== null) {
+                if (newIP.trim() === '') {
+                    // Clear override - use auto-detected
+                    localStorage.removeItem('cyberblue_override_ip');
+                    showNotification('Using auto-detected IP address', 'info');
+                    // Update the IP display button
+                    updateIPDisplay();
+                    // Refresh tool cards to show new URLs
+                    setTimeout(() => {
+                        loadTools();
+                    }, 1000);
+                } else {
+                    // Validate IP format (basic validation)
+                    const ipPattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^[a-zA-Z0-9.-]+$/;
+                    if (ipPattern.test(newIP.trim())) {
+                        localStorage.setItem('cyberblue_override_ip', newIP.trim());
+                        showNotification(`IP override set to: ${newIP.trim()}`, 'success');
+                        // Update the IP display button
+                        updateIPDisplay();
+                        // Refresh tool cards to show new URLs
+                        setTimeout(() => {
+                            loadTools();
+                        }, 1000);
+                    } else {
+                        showNotification('Invalid IP address format', 'error');
+                    }
+                }
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} alert-dismissible fade show position-fixed`;
+            notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
+        // Update IP display button
+        function updateIPDisplay() {
+            const currentIP = getServerIP();
+            const overrideIP = localStorage.getItem('cyberblue_override_ip');
+            const displayElement = document.getElementById('current-ip-display');
+
+            if (displayElement) {
+                if (overrideIP) {
+                    displayElement.innerHTML = `IP: ${currentIP}`;
+                    displayElement.parentElement.title = `Using override IP: ${currentIP} (Click to change)`;
+                } else {
+                    displayElement.innerHTML = `IP: ${currentIP}`;
+                    displayElement.parentElement.title = `Using auto-detected IP: ${currentIP} (Click to override)`;
+                }
+            }
         }
 
         // Detect server IP on page load
@@ -1871,11 +1960,15 @@
                     serverIP = window.location.hostname;
                     console.log('Using browser hostname as fallback:', serverIP);
                 }
+
+                // Update the IP display button
+                updateIPDisplay();
             } catch (error) {
                 console.error('Error detecting server IP:', error);
                 // Fallback to browser's current hostname
                 serverIP = window.location.hostname;
                 console.log('Using browser hostname as fallback due to error:', serverIP);
+                updateIPDisplay();
             }
         }
 

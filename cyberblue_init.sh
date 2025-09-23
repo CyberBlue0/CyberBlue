@@ -68,36 +68,26 @@ check_prerequisites() {
     if [ ${#missing_deps[@]} -gt 0 ]; then
         echo "⚠️  Missing prerequisites: ${missing_deps[*]}"
         
-        if [[ "$INSTALL_PREREQUISITES" == "true" ]]; then
-            echo "🚀 Installing prerequisites automatically..."
-            if [[ -f "$SCRIPT_DIR/install-prerequisites.sh" ]]; then
-                "$SCRIPT_DIR/install-prerequisites.sh" --force
-                echo "✅ Prerequisites installed successfully"
-                
-                # Apply Docker group in current session to avoid logout/login
-                echo "🔧 Applying Docker group permissions for current session..."
-                if sg docker -c "docker --version" >/dev/null 2>&1; then
-                    echo "✅ Docker access ready - continuing with installation"
-                    export DOCKER_ACCESS_READY=true
-                else
-                    echo "⚠️  Docker group requires session refresh"
-                    echo "🔄 Applying Docker group with newgrp..."
-                    exec newgrp docker << 'EOF'
-# Continue installation in new group context
-exec "$0" "${@/--install-prerequisites/}"
-EOF
-                fi
+        echo "🚀 Installing prerequisites automatically..."
+        if [[ -f "$SCRIPT_DIR/install-prerequisites.sh" ]]; then
+            "$SCRIPT_DIR/install-prerequisites.sh" --force
+            echo "✅ Prerequisites installed successfully"
+            
+            # Apply Docker group in current session to avoid logout/login
+            echo "🔧 Applying Docker group permissions for current session..."
+            if sg docker -c "docker --version" >/dev/null 2>&1; then
+                echo "✅ Docker access ready - continuing with installation"
+                export DOCKER_ACCESS_READY=true
             else
-                echo "❌ Prerequisites script not found: $SCRIPT_DIR/install-prerequisites.sh"
-                exit 1
+                echo "⚠️  Docker group requires session refresh"
+                echo "🔄 Applying Docker group with newgrp..."
+                exec newgrp docker << 'EOF'
+# Continue installation in new group context
+exec "$0" "$@"
+EOF
             fi
         else
-            echo ""
-            echo "📋 To install prerequisites:"
-            echo "  Option 1: ./install-prerequisites.sh"
-            echo "  Option 2: ./cyberblue_init.sh --install-prerequisites"
-            echo ""
-            echo "Or manually install Docker and Docker Compose, then run this script again."
+            echo "❌ Prerequisites script not found: $SCRIPT_DIR/install-prerequisites.sh"
             exit 1
         fi
     else
@@ -821,28 +811,36 @@ apply_docker_networking_fixes
 # Now proceed with service-specific configurations
 echo ""
 echo "🔧 Configuring Fleet database..."
-echo "   This may take 30-60 seconds - please wait..."
-if ! timeout 120 sudo docker run --rm \
+echo "   This may take 2-3 minutes - Fleet database initialization..."
+if timeout 300 sudo docker run --rm \
   --network=cyber-blue \
   -e FLEET_MYSQL_ADDRESS=fleet-mysql:3306 \
   -e FLEET_MYSQL_USERNAME=fleet \
   -e FLEET_MYSQL_PASSWORD=fleetpass \
   -e FLEET_MYSQL_DATABASE=fleet \
-  fleetdm/fleet:latest fleet prepare db 2>&1 | while read line; do
-    echo "   Fleet DB: $line"
-  done; then
+  fleetdm/fleet:latest fleet prepare db >/dev/null 2>&1; then
     echo "✅ Fleet database configured successfully"
 else
     echo "⚠️  Fleet database preparation failed or timed out - Fleet may not work properly"
 fi
 
 echo "🚀 Starting Fleet server..."
-if ! sudo docker compose up -d fleet-server 2>&1 | while read line; do
-    echo "   Fleet: $line"
-done; then
-    echo "⚠️  Failed to start fleet-server - continuing anyway"
-else
+echo "   Fleet server startup may take 1-2 minutes..."
+if timeout 180 sudo docker compose up -d fleet-server >/dev/null 2>&1; then
     echo "✅ Fleet server started successfully"
+    
+    # Monitor Fleet health for 3 minutes
+    echo "🔍 Monitoring Fleet health (up to 3 minutes)..."
+    for i in {1..12}; do
+        if sudo docker ps --filter "name=fleet-server" --format "{{.Status}}" | grep -q "Up"; then
+            echo "✅ Fleet server is running and healthy"
+            break
+        fi
+        echo "   Fleet health check: $i/12 (${i}5s elapsed)"
+        sleep 15
+    done
+else
+    echo "⚠️  Failed to start fleet-server - continuing anyway"
 fi
 
 # ----------------------------
