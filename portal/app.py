@@ -746,50 +746,44 @@ def force_start_system():
         # Execute the force start commands
         def run_force_start():
             try:
-                # Since we're running in a container, we need to use docker exec to run commands on the host
-                # We'll use the docker socket that's mounted to execute commands
+                # Since restarting Docker from within a container causes issues,
+                # let's try a simpler approach: just restart the containers without restarting Docker daemon
                 
-                # Step 1: Restart Docker service on the host
-                logger.info("Restarting Docker service on host...")
-                # Use docker exec to run the command on the host via a privileged container
-                restart_cmd = [
-                    'docker', 'run', '--rm', '--privileged', 
-                    '--pid=host', '--net=host', 
-                    '-v', '/:/host',
-                    'alpine:latest', 
-                    'nsenter', '-t', '1', '-m', '-u', '-n', '-p', '--',
-                    'systemctl', 'restart', 'docker'
+                logger.info("Force starting containers without Docker daemon restart...")
+                
+                # Step 1: Stop all containers first
+                logger.info("Stopping all containers...")
+                stop_cmd = [
+                    'docker', 'run', '--rm', 
+                    '-v', '/var/run/docker.sock:/var/run/docker.sock',
+                    'alpine/docker:latest',
+                    'sh', '-c', 'docker stop $(docker ps -q) 2>/dev/null || true'
                 ]
                 
                 result1 = subprocess.run(
-                    restart_cmd,
+                    stop_cmd,
                     capture_output=True, text=True, timeout=60
                 )
                 
-                if result1.returncode != 0:
-                    logger.error(f"Docker restart failed: {result1.stderr}")
-                    changelog_manager.add_entry(
-                        "force_start_failed",
-                        f"Docker restart failed: {result1.stderr}",
-                        user=getattr(current_user, 'username', 'api_user'),
-                        level="error"
-                    )
-                    return False
+                logger.info(f"Container stop result: {result1.returncode}")
+                if result1.stderr:
+                    logger.info(f"Stop stderr: {result1.stderr}")
 
-                # Step 2: Wait a moment for Docker to fully restart
-                logger.info("Waiting for Docker to restart...")
-                time.sleep(10)
+                # Step 2: Wait a moment
+                logger.info("Waiting for containers to stop...")
+                time.sleep(5)
 
-                # Step 3: Run docker compose up -d in the project directory on the host
+                # Step 3: Start containers using docker compose from the host directory
                 logger.info(f"Starting services in directory: {project_dir}")
+                
+                # Mount the project directory and run docker compose
                 compose_cmd = [
-                    'docker', 'run', '--rm', '--privileged',
-                    '--pid=host', '--net=host',
-                    '-v', '/:/host',
+                    'docker', 'run', '--rm', 
                     '-v', '/var/run/docker.sock:/var/run/docker.sock',
-                    'alpine:latest',
-                    'nsenter', '-t', '1', '-m', '-u', '-n', '-p', '--',
-                    'sh', '-c', f'cd {project_dir} && docker compose up -d'
+                    '-v', f'{project_dir}:{project_dir}',
+                    '-w', project_dir,
+                    'alpine/docker:latest',
+                    'sh', '-c', 'apk add --no-cache docker-compose && docker-compose up -d'
                 ]
                 
                 result2 = subprocess.run(
@@ -797,15 +791,43 @@ def force_start_system():
                     capture_output=True, text=True, timeout=300  # 5 minutes timeout
                 )
                 
+                logger.info(f"Docker compose result: {result2.returncode}")
+                if result2.stdout:
+                    logger.info(f"Compose stdout: {result2.stdout}")
+                if result2.stderr:
+                    logger.info(f"Compose stderr: {result2.stderr}")
+                
                 if result2.returncode != 0:
-                    logger.error(f"Docker compose up failed: {result2.stderr}")
-                    changelog_manager.add_entry(
-                        "force_start_failed",
-                        f"Docker compose up failed: {result2.stderr}",
-                        user=getattr(current_user, 'username', 'api_user'),
-                        level="error"
+                    # Try alternative approach with docker compose (newer syntax)
+                    logger.info("Trying with newer docker compose syntax...")
+                    compose_cmd_alt = [
+                        'docker', 'run', '--rm', 
+                        '-v', '/var/run/docker.sock:/var/run/docker.sock',
+                        '-v', f'{project_dir}:{project_dir}',
+                        '-w', project_dir,
+                        'docker:latest',
+                        'sh', '-c', 'docker compose up -d'
+                    ]
+                    
+                    result3 = subprocess.run(
+                        compose_cmd_alt,
+                        capture_output=True, text=True, timeout=300
                     )
-                    return False
+                    
+                    logger.info(f"Alternative compose result: {result3.returncode}")
+                    if result3.stdout:
+                        logger.info(f"Alt stdout: {result3.stdout}")
+                    if result3.stderr:
+                        logger.info(f"Alt stderr: {result3.stderr}")
+                    
+                    if result3.returncode != 0:
+                        changelog_manager.add_entry(
+                            "force_start_failed",
+                            f"Docker compose failed: {result2.stderr} | Alt: {result3.stderr}",
+                            user=getattr(current_user, 'username', 'api_user'),
+                            level="error"
+                        )
+                        return False
 
                 changelog_manager.add_entry(
                     "force_start_completed",
