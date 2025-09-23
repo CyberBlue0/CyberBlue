@@ -1127,8 +1127,8 @@ def get_tools():
             "description": "Full packet capture and session search engine for network analysis.",
             "port": 7008,
             "icon": "fas fa-network-wired",
-            "category": "ids",
-            "categoryName": "IDS",
+            "category": "network analysis",
+            "categoryName": "NETWORK ANALYSIS",
             "protocols": ["http"],
             "credentials": {
                 "username": "admin",
@@ -1253,8 +1253,8 @@ def get_dashboard_metrics():
             "siem": ["wazuh", "wazuh-dashboard"],
             "soar": ["shuffle", "thehive", "cortex", "caldera"],
             "cti": ["misp", "mitre-navigator"],
-            "ids": ["arkime", "evebox"],
-            "network analysis": ["wireshark"],
+            "ids": ["evebox"],
+            "network analysis": ["wireshark", "arkime"],
             "utility": ["cyberchef"],
             "management": ["fleetdm", "portainer"],
             "vulnerability": ["openvas"]
