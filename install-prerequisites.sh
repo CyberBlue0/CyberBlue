@@ -158,26 +158,60 @@ check_docker_installed() {
     return 0
 }
 
+# Function to handle apt lock conflicts
+clear_apt_locks() {
+    log_info "Checking for apt lock conflicts..."
+    
+    # Kill any stuck apt processes
+    if pgrep -f "apt|dpkg" >/dev/null 2>&1; then
+        log_info "Found running apt/dpkg processes, terminating them..."
+        sudo pkill -f "apt" >/dev/null 2>&1 || true
+        sudo pkill -f "dpkg" >/dev/null 2>&1 || true
+        sudo pkill -f "unattended-upgrade" >/dev/null 2>&1 || true
+        sleep 3
+    fi
+    
+    # Remove lock files if they exist
+    if [ -f /var/lib/dpkg/lock-frontend ] || [ -f /var/lib/dpkg/lock ] || [ -f /var/cache/apt/archives/lock ]; then
+        log_info "Clearing apt lock files..."
+        sudo rm -f /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || true
+        sudo rm -f /var/lib/dpkg/lock >/dev/null 2>&1 || true
+        sudo rm -f /var/cache/apt/archives/lock >/dev/null 2>&1 || true
+        sudo rm -f /var/lib/apt/lists/lock >/dev/null 2>&1 || true
+    fi
+    
+    # Configure dpkg if needed
+    sudo dpkg --configure -a >/dev/null 2>&1 || true
+    
+    log_info "Apt locks cleared, ready for package operations"
+}
+
 # System updates and basic packages
 install_basic_packages() {
+    # Clear any apt locks before starting
+    clear_apt_locks
+    
     if [[ "$SKIP_UPDATES" == "false" ]]; then
         log_info "Updating system packages..."
-        timeout 300 sudo apt update >/dev/null 2>&1 || log_warn "apt update timed out"
-        timeout 600 sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y >/dev/null 2>&1 || log_warn "apt upgrade timed out"
+        timeout 300 sudo apt update || log_warn "apt update timed out"
+        timeout 600 sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y || log_warn "apt upgrade timed out"
         log "System updated successfully"
     else
         log_warn "Skipping system updates (--skip-updates specified)"
-        timeout 300 sudo apt update >/dev/null 2>&1 || log_warn "apt update timed out"
+        timeout 300 sudo apt update || log_warn "apt update timed out"
     fi
     
     log_info "Installing basic packages..."
-    DEBIAN_FRONTEND=noninteractive sudo apt install -y ca-certificates curl gnupg lsb-release git >/dev/null 2>&1
+    DEBIAN_FRONTEND=noninteractive sudo apt install -y ca-certificates curl gnupg lsb-release git
     log "Basic packages installed"
 }
 
 # Install Docker
 install_docker() {
     log_info "Installing Docker CE..."
+    
+    # Clear any apt locks before Docker installation
+    clear_apt_locks
     
     # Add Docker's official GPG key
     sudo mkdir -p /etc/apt/keyrings
@@ -187,8 +221,8 @@ install_docker() {
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
     
     # Install Docker
-    timeout 300 sudo apt update >/dev/null 2>&1 || log_warn "apt update timed out"
-    timeout 600 sudo DEBIAN_FRONTEND=noninteractive apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1 || {
+    timeout 300 sudo apt update || log_warn "apt update timed out"
+    timeout 600 sudo DEBIAN_FRONTEND=noninteractive apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || {
         log_error "Docker installation failed or timed out"
         exit 1
     }

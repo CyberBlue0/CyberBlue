@@ -70,7 +70,12 @@ check_prerequisites() {
         
         echo "🚀 Installing prerequisites automatically..."
         if [[ -f "$SCRIPT_DIR/install-prerequisites.sh" ]]; then
-            "$SCRIPT_DIR/install-prerequisites.sh" --force
+            echo "   This may take 3-5 minutes - installing Docker and system updates..."
+            echo "   You'll see what's happening under the hood:"
+            echo ""
+            "$SCRIPT_DIR/install-prerequisites.sh" --force 2>&1 | while read line; do
+                echo "   $line"
+            done
             echo "✅ Prerequisites installed successfully"
             
             # Apply Docker group in current session to avoid logout/login
@@ -812,21 +817,44 @@ apply_docker_networking_fixes
 echo ""
 echo "🔧 Configuring Fleet database..."
 echo "   This may take 2-3 minutes - Fleet database initialization..."
+
+# Check for and kill any existing Fleet database preparation processes
+echo "   🔍 Checking for existing Fleet database processes..."
+EXISTING_FLEET_PROCS=$(ps aux | grep -E "fleet.*prepare" | grep -v grep | wc -l)
+if [ $EXISTING_FLEET_PROCS -gt 0 ]; then
+    echo "   🧹 Found $EXISTING_FLEET_PROCS existing Fleet prepare processes, terminating them..."
+    sudo pkill -f "fleet prepare db" >/dev/null 2>&1 || true
+    sleep 3
+    echo "   ✅ Existing processes cleaned up"
+else
+    echo "   ✅ No existing Fleet processes found"
+fi
+
+echo ""
+echo "   ⏳ Running Fleet database preparation - showing real-time output:"
+echo ""
+
+# Run your working Fleet database preparation command with real-time output
 if timeout 300 sudo docker run --rm \
   --network=cyber-blue \
   -e FLEET_MYSQL_ADDRESS=fleet-mysql:3306 \
   -e FLEET_MYSQL_USERNAME=fleet \
   -e FLEET_MYSQL_PASSWORD=fleetpass \
   -e FLEET_MYSQL_DATABASE=fleet \
-  fleetdm/fleet:latest fleet prepare db >/dev/null 2>&1; then
+  fleetdm/fleet:latest fleet prepare db 2>&1 | sed 's/^/   Fleet DB: /'; then
+    echo ""
     echo "✅ Fleet database configured successfully"
 else
-    echo "⚠️  Fleet database preparation failed or timed out - Fleet may not work properly"
+    echo ""
+    echo "⚠️  Fleet database preparation failed - continuing anyway"
 fi
 
 echo "🚀 Starting Fleet server..."
 echo "   Fleet server startup may take 1-2 minutes..."
-if timeout 180 sudo docker compose up -d fleet-server >/dev/null 2>&1; then
+echo "   You'll see the startup output below:"
+echo ""
+if timeout 180 sudo docker compose up -d fleet-server 2>&1 | sed 's/^/   /'; then
+    echo ""
     echo "✅ Fleet server started successfully"
     
     # Monitor Fleet health for 3 minutes
