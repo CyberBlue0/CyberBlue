@@ -720,35 +720,19 @@ def force_start_system():
         # Detect the project directory dynamically
         def find_project_directory():
             """Find the CyberBlue project directory dynamically"""
-            possible_paths = [
+            # Since we're running in a container, we need to check paths on the host system
+            # We know the most likely location is /home/ubuntu/CyberBlue
+            host_possible_paths = [
                 '/home/ubuntu/CyberBlue',
                 '/opt/CyberBlue', 
                 '/root/CyberBlue',
-                os.path.expanduser('~/CyberBlue'),
-                os.getcwd(),  # Current working directory
+                '/home/*/CyberBlue',  # Wildcard for different users
             ]
             
-            # Also check if we're already in a CyberBlue directory
-            current_dir = os.getcwd()
-            if 'CyberBlue' in current_dir or os.path.exists(os.path.join(current_dir, 'docker-compose.yml')):
-                possible_paths.insert(0, current_dir)
-            
-            # Check for parent directories that might contain CyberBlue
-            parent_dir = os.path.dirname(current_dir)
-            while parent_dir != '/' and parent_dir != parent_dir:  # Stop at root
-                cyberblue_path = os.path.join(parent_dir, 'CyberBlue')
-                if os.path.exists(cyberblue_path):
-                    possible_paths.insert(0, cyberblue_path)
-                parent_dir = os.path.dirname(parent_dir)
-            
-            for path in possible_paths:
-                if os.path.exists(path) and os.path.exists(os.path.join(path, 'docker-compose.yml')):
-                    logger.info(f"Found CyberBlue project directory: {path}")
-                    return path
-            
-            # Fallback to current directory
-            logger.warning("Could not find CyberBlue project directory, using current directory")
-            return os.getcwd()
+            # First, try the most common location
+            default_path = '/home/ubuntu/CyberBlue'
+            logger.info(f"Using default CyberBlue project directory: {default_path}")
+            return default_path
 
         project_dir = find_project_directory()
         
@@ -762,10 +746,23 @@ def force_start_system():
         # Execute the force start commands
         def run_force_start():
             try:
-                # Step 1: Restart Docker service
-                logger.info("Restarting Docker service...")
+                # Since we're running in a container, we need to use docker exec to run commands on the host
+                # We'll use the docker socket that's mounted to execute commands
+                
+                # Step 1: Restart Docker service on the host
+                logger.info("Restarting Docker service on host...")
+                # Use docker exec to run the command on the host via a privileged container
+                restart_cmd = [
+                    'docker', 'run', '--rm', '--privileged', 
+                    '--pid=host', '--net=host', 
+                    '-v', '/:/host',
+                    'alpine:latest', 
+                    'nsenter', '-t', '1', '-m', '-u', '-n', '-p', '--',
+                    'systemctl', 'restart', 'docker'
+                ]
+                
                 result1 = subprocess.run(
-                    ['sudo', 'systemctl', 'restart', 'docker'],
+                    restart_cmd,
                     capture_output=True, text=True, timeout=60
                 )
                 
@@ -780,13 +777,23 @@ def force_start_system():
                     return False
 
                 # Step 2: Wait a moment for Docker to fully restart
-                time.sleep(5)
+                logger.info("Waiting for Docker to restart...")
+                time.sleep(10)
 
-                # Step 3: Change to project directory and run docker compose up -d
+                # Step 3: Run docker compose up -d in the project directory on the host
                 logger.info(f"Starting services in directory: {project_dir}")
+                compose_cmd = [
+                    'docker', 'run', '--rm', '--privileged',
+                    '--pid=host', '--net=host',
+                    '-v', '/:/host',
+                    '-v', '/var/run/docker.sock:/var/run/docker.sock',
+                    'alpine:latest',
+                    'nsenter', '-t', '1', '-m', '-u', '-n', '-p', '--',
+                    'sh', '-c', f'cd {project_dir} && docker compose up -d'
+                ]
+                
                 result2 = subprocess.run(
-                    ['sudo', 'docker', 'compose', 'up', '-d'],
-                    cwd=project_dir,
+                    compose_cmd,
                     capture_output=True, text=True, timeout=300  # 5 minutes timeout
                 )
                 
