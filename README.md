@@ -240,35 +240,42 @@ echo "🚀 Ready to clone and deploy CyberBlue SOC"
 
 **💡 Note**: The `newgrp docker` command usually eliminates the need to logout/login. If Docker commands still require `sudo`, then logout/login is needed.
 
-### ⚡ Simple Installation (Choose One)
+### ⚡ One-Command Installation
 
-**Two simple methods that work everywhere:**
+**Single script installation that works everywhere:**
 
-#### 🎯 **Method 1: Complete Installer (Recommended)**
+#### 🎯 **One-Command Setup (Recommended)**
 ```bash
-# Clone and install everything in one go
+# Clone and install everything in one command
 git clone https://github.com/CyberBlue0/CyberBlue.git
 cd CyberBlue
-chmod +x install-cyberblue-final.sh
-./install-cyberblue-final.sh
+chmod +x cyberblue_init.sh
+./cyberblue_init.sh --install-prerequisites
 ```
-**✅ Handles everything: Prerequisites, Docker, all services**
-**✅ No hanging, no logout required, bulletproof**
 
-#### 🔧 **Method 2: Manual Prerequisites (Advanced Users)**
+**✅ Complete automated installation:**
+- ✅ Installs all prerequisites (Docker, Docker Compose, system optimizations)
+- ✅ Deploys all 15+ security tools automatically
+- ✅ Configures networking and SSL certificates
+- ✅ Sets up authentication and portal access
+- ✅ No logout required, no hanging, bulletproof deployment
+- ✅ Works on AWS, VMware, VirtualBox, and bare metal
+
+#### 🔧 **Manual Prerequisites (Advanced Users)**
 ```bash
-# Clone the repository
+# If you prefer to install prerequisites manually
 git clone https://github.com/CyberBlue0/CyberBlue.git
 cd CyberBlue
 
-# Step 1: Install prerequisites manually (copy the prerequisites block above)
+# Step 1: Install prerequisites manually (use prerequisites block above)
 # Step 2: Run CyberBlue initialization
 chmod +x cyberblue_init.sh
 ./cyberblue_init.sh
 ```
-**✅ Manual control, use prerequisites block above**
 
-**💡 Both methods work on all platforms (AWS, VMware, VirtualBox, bare metal) and deliver 15/15 services.**
+**💡 The main script `cyberblue_init.sh` is the ONLY script you need - it handles everything and works on all platforms.**
+
+> **📝 Note**: Other installation scripts in the repository (`install-cyberblue-final.sh`, `cyberblue_complete_install.sh`, etc.) are legacy/development scripts. **Use `cyberblue_init.sh` as your single installation solution.**
 
 ### 🔍 **Enhanced Arkime Operations**
 
@@ -326,8 +333,9 @@ Individual tools are available on ports **7000-7099**:
 ## 📖 Documentation
 
 ### 🚀 Quick Start
-- **[Installation Guide](INSTALL.md)** - Detailed setup instructions
+- **[Installation Guide](INSTALLATION_GUIDE.md)** - Single script installation instructions
 - **[Security Guide](SECURITY.md)** - Hardening and best practices
+- **[Deprecated Scripts](DEPRECATED_SCRIPTS.md)** - Legacy scripts to avoid
 
 ### 📚 Comprehensive Documentation
 - **[📚 Documentation Hub](docs/README.md)** - Complete documentation index
