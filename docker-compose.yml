@@ -101,7 +101,7 @@ services:
     ports:
       - "7015:5636"
     volumes:
-      - ./suricata/logs/eve.json:/var/log/suricata/eve.json:ro
+      - ./suricata/logs:/var/log/suricata:ro
     restart: always
     networks:
       - cyber-blue
