@@ -713,6 +713,150 @@ def add_changelog_entry():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/api/force-start', methods=['POST'])
+def force_start_system():
+    """Force start system by restarting Docker and bringing up all services"""
+    try:
+        # Detect the project directory dynamically
+        def find_project_directory():
+            """Find the CyberBlue project directory dynamically"""
+            possible_paths = [
+                '/home/ubuntu/CyberBlue',
+                '/opt/CyberBlue', 
+                '/root/CyberBlue',
+                os.path.expanduser('~/CyberBlue'),
+                os.getcwd(),  # Current working directory
+            ]
+            
+            # Also check if we're already in a CyberBlue directory
+            current_dir = os.getcwd()
+            if 'CyberBlue' in current_dir or os.path.exists(os.path.join(current_dir, 'docker-compose.yml')):
+                possible_paths.insert(0, current_dir)
+            
+            # Check for parent directories that might contain CyberBlue
+            parent_dir = os.path.dirname(current_dir)
+            while parent_dir != '/' and parent_dir != parent_dir:  # Stop at root
+                cyberblue_path = os.path.join(parent_dir, 'CyberBlue')
+                if os.path.exists(cyberblue_path):
+                    possible_paths.insert(0, cyberblue_path)
+                parent_dir = os.path.dirname(parent_dir)
+            
+            for path in possible_paths:
+                if os.path.exists(path) and os.path.exists(os.path.join(path, 'docker-compose.yml')):
+                    logger.info(f"Found CyberBlue project directory: {path}")
+                    return path
+            
+            # Fallback to current directory
+            logger.warning("Could not find CyberBlue project directory, using current directory")
+            return os.getcwd()
+
+        project_dir = find_project_directory()
+        
+        changelog_manager.add_entry(
+            "force_start_initiated",
+            f"Force start system initiated from directory: {project_dir}",
+            user=getattr(current_user, 'username', 'api_user'),
+            level="info"
+        )
+
+        # Execute the force start commands
+        def run_force_start():
+            try:
+                # Step 1: Restart Docker service
+                logger.info("Restarting Docker service...")
+                result1 = subprocess.run(
+                    ['sudo', 'systemctl', 'restart', 'docker'],
+                    capture_output=True, text=True, timeout=60
+                )
+                
+                if result1.returncode != 0:
+                    logger.error(f"Docker restart failed: {result1.stderr}")
+                    changelog_manager.add_entry(
+                        "force_start_failed",
+                        f"Docker restart failed: {result1.stderr}",
+                        user=getattr(current_user, 'username', 'api_user'),
+                        level="error"
+                    )
+                    return False
+
+                # Step 2: Wait a moment for Docker to fully restart
+                time.sleep(5)
+
+                # Step 3: Change to project directory and run docker compose up -d
+                logger.info(f"Starting services in directory: {project_dir}")
+                result2 = subprocess.run(
+                    ['sudo', 'docker', 'compose', 'up', '-d'],
+                    cwd=project_dir,
+                    capture_output=True, text=True, timeout=300  # 5 minutes timeout
+                )
+                
+                if result2.returncode != 0:
+                    logger.error(f"Docker compose up failed: {result2.stderr}")
+                    changelog_manager.add_entry(
+                        "force_start_failed",
+                        f"Docker compose up failed: {result2.stderr}",
+                        user=getattr(current_user, 'username', 'api_user'),
+                        level="error"
+                    )
+                    return False
+
+                changelog_manager.add_entry(
+                    "force_start_completed",
+                    f"Force start completed successfully in {project_dir}",
+                    user=getattr(current_user, 'username', 'api_user'),
+                    level="success"
+                )
+                return True
+
+            except subprocess.TimeoutExpired:
+                logger.error("Force start operation timed out")
+                changelog_manager.add_entry(
+                    "force_start_failed",
+                    "Force start operation timed out",
+                    user=getattr(current_user, 'username', 'api_user'),
+                    level="error"
+                )
+                return False
+            except Exception as e:
+                logger.error(f"Error during force start: {e}")
+                changelog_manager.add_entry(
+                    "force_start_failed",
+                    f"Force start error: {str(e)}",
+                    user=getattr(current_user, 'username', 'api_user'),
+                    level="error"
+                )
+                return False
+
+        # Run the force start in a separate thread to avoid blocking the response
+        import threading
+        
+        def async_force_start():
+            success = run_force_start()
+            if success:
+                logger.info("Force start completed successfully")
+            else:
+                logger.error("Force start failed")
+
+        force_start_thread = threading.Thread(target=async_force_start, daemon=True)
+        force_start_thread.start()
+
+        return jsonify({
+            "success": True, 
+            "message": f"Force start initiated successfully in {project_dir}. This may take several minutes.",
+            "project_directory": project_dir
+        })
+
+    except Exception as e:
+        logger.error(f"Error in force start API: {e}")
+        changelog_manager.add_entry(
+            "force_start_error",
+            f"Force start API error: {str(e)}",
+            user=getattr(current_user, 'username', 'api_user'),
+            level="error"
+        )
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+
 @app.route('/api/server-info')
 def get_server_info():
     """Get server information API endpoint"""

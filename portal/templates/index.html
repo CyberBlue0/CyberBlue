@@ -1610,12 +1610,19 @@
 
                 <!-- IP Override Button -->
                 <div class="ip-override-section mt-3">
-                    <button class="btn btn-outline-light btn-sm" onclick="promptForIPOverride()"
-                        title="Override IP address for tool access">
-                        <i class="fas fa-globe me-1"></i>
-                        <span id="current-ip-display">IP: Auto</span>
-                    </button>
-                    <small class="text-muted d-block mt-1">Click to set public IP</small>
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <button class="btn btn-outline-light btn-sm" onclick="promptForIPOverride()"
+                            title="Override IP address for tool access">
+                            <i class="fas fa-globe me-1"></i>
+                            <span id="current-ip-display">IP: Auto</span>
+                        </button>
+                        <button class="btn btn-warning btn-sm" onclick="forceStartSystem()" 
+                            title="Restart Docker and bring up all services" id="force-start-btn">
+                            <i class="fas fa-rocket me-1"></i>
+                            Force Start
+                        </button>
+                    </div>
+                    <small class="text-muted d-block mt-1">Click to set public IP or force restart all services</small>
                 </div>
             </div>
 
@@ -1942,6 +1949,53 @@
                     displayElement.innerHTML = `IP: ${currentIP}`;
                     displayElement.parentElement.title = `Using auto-detected IP: ${currentIP} (Click to override)`;
                 }
+            }
+        }
+
+        // Force Start System - Restart Docker and bring up all services
+        async function forceStartSystem() {
+            const button = document.getElementById('force-start-btn');
+            if (!button) return;
+
+            // Confirm action
+            if (!confirm('This will restart Docker and bring up all services. This may take a few minutes. Continue?')) {
+                return;
+            }
+
+            // Disable button and show loading state
+            button.disabled = true;
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Starting...';
+
+            try {
+                showNotification('Force starting system... This may take several minutes.', 'info');
+                
+                const response = await fetch('/api/force-start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification('System force start initiated successfully!', 'success');
+                    // Refresh container status after a delay
+                    setTimeout(() => {
+                        loadContainerStats();
+                        loadTools();
+                    }, 5000);
+                } else {
+                    showNotification(`Force start failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error during force start:', error);
+                showNotification('Error during force start operation', 'error');
+            } finally {
+                // Re-enable button
+                button.disabled = false;
+                button.innerHTML = originalHTML;
             }
         }
 
