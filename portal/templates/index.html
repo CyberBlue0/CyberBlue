@@ -1616,7 +1616,7 @@
                             <i class="fas fa-globe me-1"></i>
                             <span id="current-ip-display">IP: Auto</span>
                         </button>
-                        <button class="btn btn-warning btn-sm" onclick="forceStartSystem()" 
+                        <button class="btn btn-warning btn-sm" onclick="forceStartSystem()"
                             title="Restart Docker and bring up all services" id="force-start-btn">
                             <i class="fas fa-rocket me-1"></i>
                             Force Start
@@ -1969,7 +1969,7 @@
 
             try {
                 showNotification('Force starting system... This may take several minutes.', 'info');
-                
+
                 const response = await fetch('/api/force-start', {
                     method: 'POST',
                     headers: {
